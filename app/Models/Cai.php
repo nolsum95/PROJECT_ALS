@@ -34,9 +34,9 @@ class Cai extends Model
         return $this->hasMany(Learner::class, 'assigned_cai', 'cai_id');
     }
 
-    public function clcs()
+    public function clc()
     {
-        return $this->hasMany(Clc::class, 'fk_cai_id', 'cai_id');
+        return $this->belongsTo(Clc::class, 'assigned_clc', 'clc_id');
     }
 
     public function modules()

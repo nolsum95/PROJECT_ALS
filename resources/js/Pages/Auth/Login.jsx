@@ -1,5 +1,7 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { showError, showSuccess } from '@/Utils/sweetalert';
 
 export default function Login({ status, canResetPassword }) {
@@ -7,6 +9,7 @@ export default function Login({ status, canResetPassword }) {
         email: '',
         password: '',
     });
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         if (status) {
@@ -60,15 +63,35 @@ export default function Login({ status, canResetPassword }) {
                             <label htmlFor="password" className="form-label">
                                 Password
                             </label>
-                            <input
-                                id="password"
-                                type="password"
-                                className={`form-input ${errors.password ? 'error' : ''}`}
-                                value={data.password}
-                                onChange={(e) => setData('password', e.target.value)}
-                                placeholder="Enter your password"
-                                required
-                            />
+                            <div style={{ position: 'relative' }}>
+                                <input
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    className={`form-input ${errors.password ? 'error' : ''}`}
+                                    value={data.password}
+                                    onChange={(e) => setData('password', e.target.value)}
+                                    placeholder="Enter your password"
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword((v) => !v)}
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    style={{
+                                        position: 'absolute',
+                                        right: 8,
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        padding: 4,
+                                        cursor: 'pointer',
+                                        color: '#94a3b8',
+                                    }}
+                                >
+                                    {showPassword ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+                                </button>
+                            </div>
                             {errors.password && (
                                 <div className="error-message">{errors.password}</div>
                             )}

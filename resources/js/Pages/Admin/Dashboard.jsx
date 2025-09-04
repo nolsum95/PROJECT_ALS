@@ -6,11 +6,10 @@ import EnrollmentContent from './EnrollmentContent.jsx';
 import Sidebar from '@/Components/Admin/Sidebar.jsx';
 import MenuIcon from '@mui/icons-material/Menu';
 
-export default function AdminDashboard({ auth, stats, flash, users = [], enrollments = {} }) {
+export default function AdminDashboard({ auth, stats, flash, users = [], enrollments = {}, lists = {}, section = 'dashboard' }) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const initialSection = typeof window !== 'undefined' && window.location.hash ? window.location.hash.replace('#','') : 'dashboard';
-    const [expandedSections, setExpandedSections] = useState(['dashboard']);
-    const [selectedSection, setSelectedSection] = useState(initialSection);
+    const [expandedSections, setExpandedSections] = useState([section]);
+    const [selectedSection, setSelectedSection] = useState(section);
 
     const user = auth?.user;
 
@@ -85,7 +84,13 @@ export default function AdminDashboard({ auth, stats, flash, users = [], enrollm
                 <Sidebar
                     user={user}
                     selectedSection={selectedSection}
-                    onSelectSection={(s) => setSelectedSection(s)}
+                    onSelectSection={(s) => {
+                        // If a main nav item is clicked, collapse all expanded sections
+                        if (["dashboard", "users", "enrollments"].includes(s)) {
+                            setExpandedSections([s]);
+                        }
+                        setSelectedSection(s);
+                    }}
                     expandedSections={expandedSections}
                     onToggleSection={toggleSection}
                     sidebarOpen={sidebarOpen}
@@ -115,12 +120,12 @@ export default function AdminDashboard({ auth, stats, flash, users = [], enrollm
                     </header>
                     
                     {/* Dashboard Content */}
-                    {selectedSection === 'dashboard' && (
+                    {(selectedSection === 'dashboard' || !['dashboard','users','enrollments','clc-list','clc-assign','clc-cai-list','clc-learner-list','clc-reports'].includes(selectedSection)) && (
                         <div className="dashboard-content">
-                            <div className="welcome-card">
+                            {/* <div className="welcome-card">
                                 <h1 className="welcome-title">Welcome to Admin Dashboard</h1>
                                 <p className="welcome-subtitle">Manage your ALS Center operations from here.</p>
-                            </div>
+                            </div> */}
                             
                             <div className="stats-grid">
                                 <div className="stat-card">
@@ -139,7 +144,7 @@ export default function AdminDashboard({ auth, stats, flash, users = [], enrollm
                                 </div>
                                 
                                 <div className="stat-card">
-                                    <div className="stat-title">CLC Management</div>
+                                    <div className="stat-title">CLCs</div>
                                     <div className="stat-number">{stats?.clcs || 0}</div>
                                 </div>
                             </div>
@@ -161,7 +166,7 @@ export default function AdminDashboard({ auth, stats, flash, users = [], enrollm
 
                     {/* Enrollments Content */}
                     {selectedSection === 'enrollments' && (
-                        <EnrollmentContent enrollments={enrollments} />
+                        <EnrollmentContent enrollments={enrollments} lists={lists} />
                     )}
                 </div>
             </div>

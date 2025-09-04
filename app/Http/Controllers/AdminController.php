@@ -2,24 +2,27 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use App\Models\Cai;
-use App\Models\Learner;
 use App\Models\Clc;
-use App\Models\Modules;
-use App\Models\EnrollmentAlpha;
-use Illuminate\Http\Request;
+use App\Models\User;
 use Inertia\Inertia;
+use App\Models\Learner;
+use App\Models\Modules;
+use Illuminate\Http\Request;
+use App\Models\EnrollmentAlpha;
+use App\Mail\EnrolledUserCreation;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use App\Mail\EnrolledUserCreation;
+
 
 class AdminController extends Controller
 {
     /**
      * Display the admin dashboard.
      */
-    public function dashboard()
+    public function dashboard(Request $request, $section = 'dashboard')
     {
         try {
             // Get statistics for the dashboard with safe fallbacks
@@ -100,17 +103,23 @@ class AdminController extends Controller
                     'hh.isIndegenous', 'hh.ipCommunityName', 'hh.is4PsMember', 'hh.household_Id_4Ps',
                     // CLC accessibility
                     'clc.distance_clc_km', 'clc.travel_hours_minutes', 'clc.transport_mode', 'clc.mon', 'clc.tue', 'clc.wed', 'clc.thur', 'clc.fri', 'clc.sat', 'clc.sun',
-                    // User existence flag
-                    'u.user_id as created_user_id',
+                    // User existence flag (prefer denormalized column when present)
+                    DB::raw('COALESCE(enrollment_alpha_tb.created_user_id, u.user_id) as created_user_id'),
                 ])
                 ->orderBy('enrollment_alpha_tb.enrollment_id', 'desc')
                 ->paginate(10),
+            // Lists for assignment controls
+            'lists' => [
+                'clcs' => \App\Models\Clc::orderBy('clc_name')->get(['clc_id','clc_name']),
+                'cais' => \App\Models\Cai::orderBy('lastname')->get(['cai_id','firstname','middlename','lastname','assigned_clc']),
+            ],
             'flash' => [
                 'success' => session('success'),
                 'error' => session('error'),
                 'warning' => session('warning'),
                 'info' => session('info'),
-            ]
+            ],
+            'section' => $section,
         ]);
     }
 
@@ -135,25 +144,60 @@ class AdminController extends Controller
     public function createEnrollmentUser(\Illuminate\Http\Request $request, int $enrollmentId)
     {
         $validated = $request->validate([
-            'name' => ['required','string','max:255'],
             'email_address' => ['required','email','max:255','unique:user_tb,email_address'],
             'password' => ['required','string','min:8'],
+            'assigned_clc' => ['nullable','integer','exists:clc_tb,clc_id'],
+            'assigned_cai' => ['nullable','integer','exists:cai_tb,cai_id'],
         ]);
 
         $alpha = \App\Models\EnrollmentAlpha::where('enrollment_id', $enrollmentId)->firstOrFail();
 
+        // Generate username: lastname_firstname0000
+        $baseUsername = Str::of(($alpha->lastname ?? 'user').'_'.($alpha->firstname ?? 'als'))
+            ->lower()
+            ->replace(' ', '_')
+            ->replace('__', '_');
+        $rand = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        $username = (string) $baseUsername.$rand;
+
+        // Build full name for learner/mail greeting
+        $fullName = trim(($alpha->firstname ?? '').' '.(($alpha->middlename ?? '') ? ($alpha->middlename.' ') : '').($alpha->lastname ?? ''));
+
         $user = \App\Models\User::create([
-            'name' => $validated['name'],
+            'name' => $username,
             'email_address' => $validated['email_address'],
             'password' => \Illuminate\Support\Facades\Hash::make($validated['password']),
             'role_type' => 'Learner',
         ]);
 
+        // Persist created user ID on enrollment for fast lookup in dashboard
+        try {
+            \App\Models\EnrollmentAlpha::where('enrollment_id', $enrollmentId)
+                ->update(['created_user_id' => $user->user_id]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to set created_user_id on enrollment: '.$e->getMessage());
+        }
+
         try {
             Mail::to($validated['email_address'])
-                ->send(new EnrolledUserCreation($validated['name'], $validated['email_address'], $validated['password']));
+                ->send(new EnrolledUserCreation($fullName !== '' ? $fullName : $username, $validated['email_address'], $validated['password']));
         } catch (\Throwable $e) {
             Log::error('Email send failed: '.$e->getMessage());
+        }
+
+        // Optionally create Learner row with assignments when provided
+        try {
+            if (!empty($validated['assigned_clc']) || !empty($validated['assigned_cai'])) {
+                \App\Models\Learner::create([
+                    'fk_userId' => $user->user_id,
+                    'fullname' => $fullName !== '' ? $fullName : $username,
+                    'assigned_clc' => $validated['assigned_clc'] ?? null,
+                    'assigned_cai' => $validated['assigned_cai'] ?? null,
+                    'status' => 'Active',
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Failed creating learner on enrollment user creation: '.$e->getMessage());
         }
 
         return back()->with('success', 'User account created and credentials sent.');

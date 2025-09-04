@@ -84,18 +84,30 @@
 }
 
 
-
+.user-nav{
+  margin: -10px 0 -40px 0;
+}
 .nav-item {
     display: flex;
     align-items: center;
-    padding: 12px 20px;
+   padding: 5px 5px !important;
     color: #cbd5e1;
     text-decoration: none;
     transition: all 0.3s ease;
     cursor: pointer;
     position: relative;
 }
+.nav-link{
+    display: flex;
+    align-items: center;
+    padding: 5px 5px !important;
+    color: #cbd5e1;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
 
+}
 .nav-item:hover {
     background: #334155;
     color: white;
@@ -353,6 +365,7 @@
     margin-top: auto;
     border-top: 1px solid #334155;
     padding-top: 16px;
+  
 }
 
 .logout-nav-item:hover {

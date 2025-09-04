@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import GroupIcon from '@mui/icons-material/Group';
+import SummarizeIcon from '@mui/icons-material/Summarize';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import ApartmentIcon from '@mui/icons-material/Apartment';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -27,32 +28,34 @@ export default function Sidebar({
 
 			<nav className="sidebar-nav">
 				<div className="nav-section">
-					<div 
+					<div
 						className={`nav-item ${selectedSection === 'dashboard' ? 'active' : ''}`}
-						onClick={() => onSelectSection('dashboard')}
 					>
-						<div className="nav-icon"><DashboardIcon fontSize="small" /></div>
-						<span className="nav-text">Dashboard</span>
-					</div>
+						<Link href={route('admin.dashboard')} className="nav-link" onClick={() => onSelectSection('dashboard')} style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+							<div className="nav-icon"><DashboardIcon fontSize="small" /></div>
+							<span className="nav-text">Overview</span>
+						</Link>
 
-					<div 
-						className={`nav-item ${selectedSection === 'users' ? 'active' : ''}`}
-						onClick={() => onSelectSection('users')}
-					>
+					</div>
+					<Link href={route('admin.dashboard', { section: 'users' })} className="nav-link" style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
 						<div className="nav-icon"><GroupIcon fontSize="small" /></div>
 						<span className="nav-text">Users</span>
+					</Link>
+
+
+
+					<div
+						className={`nav-item ${selectedSection === 'enrollments' ? 'active' : ''}`}
+					>
+						<Link href={route('admin.dashboard', { section: 'enrollments' })} className="nav-link" style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+							<div className="nav-icon"><EditNoteIcon fontSize="small" /></div>
+							<span className="nav-text">Enrollment</span>
+						</Link>
 					</div>
 
-					<div 
-						className={`nav-item ${selectedSection === 'enrollments' ? 'active' : ''}`}
-						onClick={() => onSelectSection('enrollments')}
-					>
-						<div className="nav-icon"><EditNoteIcon fontSize="small" /></div>
-						<span className="nav-text">Enrollment</span>
-					</div>
 
 					{/* CLC Management */}
-					<div 
+					<div
 						className={`nav-item ${expandedSections.includes('clc') ? 'expanded' : ''}`}
 						onClick={() => onToggleSection('clc')}
 					>
@@ -62,24 +65,32 @@ export default function Sidebar({
 					</div>
 					{expandedSections.includes('clc') && (
 						<div className="sub-nav">
-							<div className={`sub-nav-item ${selectedSection === 'assign-clc' ? 'active' : ''}`} onClick={() => onSelectSection('assign-clc')}>
+							<Link href={route('clc.index')} className={`sub-nav-item`} onClick={() => onSelectSection('clc-list')}>
+								<div className="nav-icon"><ApartmentIcon fontSize="small" /></div>
+								CLCs
+							</Link>
+							{/* <Link href={route('clc.index')} className={`sub-nav-item`} onClick={() => onSelectSection('clc-assign')}>
 								<div className="nav-icon"><ApartmentIcon fontSize="small" /></div>
 								Assign CLC
-							</div>
-							<div className={`sub-nav-item ${selectedSection === 'cai-list' ? 'active' : ''}`} onClick={() => onSelectSection('cai-list')}>
+							</Link> */}
+							<Link href={route('cai.index')} className={`sub-nav-item`} onClick={() => onSelectSection('clc-cai-list')}>
 								<div className="nav-icon"><GroupIcon fontSize="small" /></div>
-								CAI List
-							</div>
-							<div className={`sub-nav-item ${selectedSection === 'learner-list' ? 'active' : ''}`} onClick={() => onSelectSection('learner-list')}>
+								CAIs
+							</Link>
+							<Link href={route('learner.index')} className={`sub-nav-item`} onClick={() => onSelectSection('clc-learner-list')}>
 								<div className="nav-icon"><MenuBookIcon fontSize="small" /></div>
-								Learner List
-							</div>
+								Learners
+							</Link>
+							<Link href={route('clc.reports')} className={`sub-nav-item`} onClick={() => onSelectSection('clc-reports')}>
+								<div className="nav-icon"><AssessmentIcon fontSize="small" /></div>
+								Reports
+							</Link>
 						</div>
 					)}
 				</div>
 
 				<div className="nav-section">
-					<div 
+					<div
 						className={`nav-item ${expandedSections.includes('learning') ? 'expanded' : ''}`}
 						onClick={() => onToggleSection('learning')}
 					>
@@ -87,8 +98,12 @@ export default function Sidebar({
 						<span className="nav-text">Learning Content</span>
 						<div className="nav-arrow">›</div>
 					</div>
+					<div
+						className={`nav-item ${selectedSection === 'users' ? 'active' : ''}`}
+					>
 
-					{expandedSections.includes('learning') && (
+					</div>
+					{/* {expandedSections.includes('learning') && (
 						<div className="sub-nav">
 							<Link href="#" className="sub-nav-item">
 								<div className="nav-icon"><MenuBookIcon fontSize="small" /></div>
@@ -100,7 +115,7 @@ export default function Sidebar({
 							</Link>
 							
 						</div>
-					)}
+					)} */}
 				</div>
 
 				<div className="nav-section">
@@ -110,7 +125,7 @@ export default function Sidebar({
 					</div>
 
 					<div className="nav-item">
-						<div className="nav-icon"><AssessmentIcon fontSize="small" /></div>
+						<div className="nav-icon"><SummarizeIcon fontSize="small" /></div>
 						<span className="nav-text">Reports</span>
 					</div>
 				</div>

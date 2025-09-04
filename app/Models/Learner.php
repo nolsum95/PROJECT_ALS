@@ -26,9 +26,14 @@ class Learner extends Model
         return $this->belongsTo(User::class, 'fk_userId', 'user_id');
     }
 
-    public function clcs()
+    public function clc()
     {
-        return $this->hasMany(Clc::class, 'fk_learner_id', 'learner_id');
+        return $this->belongsTo(Clc::class, 'assigned_clc', 'clc_id');
+    }
+
+    public function cai()
+    {
+        return $this->belongsTo(Cai::class, 'assigned_cai', 'cai_id');
     }
 
     public function modules()

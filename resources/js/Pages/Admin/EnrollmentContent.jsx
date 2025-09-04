@@ -24,7 +24,7 @@ import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1';
 import LockPersonIcon from '@mui/icons-material/LockPerson';
 import EnrolledUser from './modals/EnrolledUser.jsx';
 
-export default function EnrollmentContent({ enrollments = {}, canCreate = false, title = 'Enrollment Management', routes = {} }) {
+export default function EnrollmentContent({ enrollments = {}, lists = {}, canCreate = false, title = 'Enrollment Management', routes = {} }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [openInfo, setOpenInfo] = useState(false);
@@ -87,6 +87,8 @@ export default function EnrollmentContent({ enrollments = {}, canCreate = false,
 
   const [openCreateUser, setOpenCreateUser] = useState(false);
   const [createUserPayload, setCreateUserPayload] = useState(null);
+  const clcs = lists?.clcs || [];
+  const cais = lists?.cais || [];
 
   const handleCreatedUserSuccess = () => {
     const id = createUserPayload?.alpha?.id || createUserPayload?.alpha?.enrollment_id;
@@ -101,66 +103,69 @@ export default function EnrollmentContent({ enrollments = {}, canCreate = false,
 
   return (
     <div className="dashboard-content">
-      <Toolbar sx={{ px: 0, pb: 2, display: 'flex', gap: 2, justifyContent: 'space-between', flexWrap: 'wrap' }}>
-        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-          <TextField
-            variant="outlined"
-            size="small"
-            placeholder="Search enrollments..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            InputProps={{ sx: { color: '#e5e7eb' } }}
-            sx={{ minWidth: 280, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.15)' } }}
-          />
-          <TextField
-            select
-            variant="outlined"
-            size="small"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            SelectProps={{
-              MenuProps: {
-                PaperProps: {
-                  sx: { backgroundColor: '#161e31ff', color: '#e5e7eb', '& .MuiMenuItem-root': { color: '#e5e7eb' } }
+        <Toolbar sx={{ px: 0, pb: 2, display: 'flex', gap: 2, justifyContent: 'space-between', flexWrap: 'wrap' }}>
+          <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+            <TextField
+              variant="outlined"
+              size="small"
+              placeholder="Search enrollments..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              InputProps={{ sx: { color: '#e5e7eb' } }}
+              sx={{ minWidth: 280, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.15)' } }}
+            />
+            <TextField
+              select
+              variant="outlined"
+              size="small"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              SelectProps={{
+                MenuProps: {
+                  PaperProps: {
+                    sx: { backgroundColor: '#161e31ff', color: '#e5e7eb', '& .MuiMenuItem-root': { color: '#e5e7eb' } }
+                  }
                 }
-              }
-            }}
+              }}
             sx={{ minWidth: 200, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.15)' }, '& .MuiInputBase-input': { color: '#e5e7eb' } }}
-          >
-            <MenuItem value="All">All</MenuItem>
+            >
+              <MenuItem value="All">All</MenuItem>
             <MenuItem value="Applied">Applied</MenuItem>
             <MenuItem value="Pre-enrolled">Pre-enrolled</MenuItem>
             <MenuItem value="Enrolled">Enrolled</MenuItem>
-          </TextField>
-        </Stack>
-      </Toolbar>
+            </TextField>
+          </Stack>
+        </Toolbar>
       <div className="admin-table-container">
         <Table stickyHeader size="medium" aria-label="enrollments table" className="admin-table">
-          <TableHead>
-            <TableRow>
+            <TableHead>
+              <TableRow>
               <TableCell className="admin-table-header">Enrollees</TableCell>
               <TableCell className="admin-table-header">Address</TableCell>
               <TableCell className="admin-table-header">Contact</TableCell>
               <TableCell className="admin-table-header">Status</TableCell>
               <TableCell className="admin-table-header">Date Enroll</TableCell>
               <TableCell align="right" className="admin-table-header actions">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filtered.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} style={{ opacity: 0.8 }}>No enrollments found.</TableCell>
               </TableRow>
-            )}
+            </TableHead>
+            <TableBody>
+              {filtered.length === 0 && (
+                <TableRow>
+                <TableCell colSpan={6} style={{ opacity: 0.8 }}>No enrollments found.</TableCell>
+                </TableRow>
+              )}
             {filtered.map((e) => {
-              const showCreateIcon = e.status === 'Enrolled' && !e.created_user_id;
-              const showLockIcon = e.status === 'Enrolled' && !!e.created_user_id;
+              const isEnrolled = e.status === 'Enrolled';
+              const locallyCreated = createdUserIds.has(e.id);
+              const hasServerUser = !!e.created_user_id;
+              const showCreateIcon = isEnrolled && !hasServerUser && !locallyCreated;
+              const showLockIcon = isEnrolled && (hasServerUser || locallyCreated);
               return (
                 <TableRow key={e.id} hover>
                   <TableCell>{e.learner ?? '—'}</TableCell>
                   <TableCell>{e.address ?? '—'}</TableCell>
                   <TableCell>{e.contact ?? '—'}</TableCell>
-                  <TableCell>{e.status ?? '—'}</TableCell>
+                   <TableCell>{e.status ?? '—'}</TableCell>
                   <TableCell>{e.date ?? '—'}</TableCell>
                   <TableCell align="right" className="actions">
                     <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
@@ -252,7 +257,7 @@ export default function EnrollmentContent({ enrollments = {}, canCreate = false,
                       )}
                       {showCreateIcon && (
                         <IconButton
-                          onClick={() => { setCreateUserPayload({ alpha: e.alpha }); setOpenCreateUser(true); }}
+                          onClick={() => { setCreateUserPayload({ alpha: e.alpha, clcs, cais }); setOpenCreateUser(true); }}
                           size="small"
                           sx={{ color: '#22c55e' }}
                           aria-label="Create user account"
@@ -262,7 +267,7 @@ export default function EnrollmentContent({ enrollments = {}, canCreate = false,
                         </IconButton>
                       )}
                       {showLockIcon && (
-                        <IconButton className="lockPerson-icon" size="small" disabled sx={{ color: '#0b5fd6ff', opacity: 1 }} aria-label="Account created">
+                        <IconButton className="lockPerson-icon" size="small" disabled aria-label="Account created" title="Account created">
                           <LockPersonIcon />
                         </IconButton>
                       )}
@@ -271,8 +276,8 @@ export default function EnrollmentContent({ enrollments = {}, canCreate = false,
                 </TableRow>
               );
             })}
-          </TableBody>
-        </Table>
+            </TableBody>
+          </Table>
       </div>
       {enrollments && enrollments.last_page > 1 && (
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24, gap: 8 }}>

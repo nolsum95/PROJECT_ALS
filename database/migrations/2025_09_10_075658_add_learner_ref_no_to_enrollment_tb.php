@@ -9,14 +9,13 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
-    {
-        Schema::table('enrollment_alpha_tb', function (Blueprint $table) {
-            $table->enum('enrollee_status', ['Applied', 'Enrolled', 'Pre-enrolled'])
-                ->default('Applied')
-                ->after('civil_status'); // Place after civil_status
-        });
-    }
+   public function up(): void
+{
+    Schema::table('enrollment_alpha_tb', function (Blueprint $table) {
+        $table->string('learner_ref_no')->nullable()->after('enrollment_id');
+    });
+}
+
 
     /**
      * Reverse the migrations.
@@ -24,7 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('enrollment_alpha_tb', function (Blueprint $table) {
-            $table->dropColumn('enrollee_status');
+            //
         });
     }
 };

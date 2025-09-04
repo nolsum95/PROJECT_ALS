@@ -63,4 +63,33 @@ class UserController extends Controller
         return Inertia::render('Users/Show', [
             'user' => $user
         ]);
-    }}
+    }
+
+    /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, int $userId)
+    {
+        $user = User::findOrFail($userId);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email_address' => ['required','email','max:255', Rule::unique('user_tb','email_address')->ignore($user->user_id, 'user_id')],
+            'password' => 'nullable|min:8|confirmed',
+            'role_type' => ['required', Rule::in(['Admin', 'CAI', 'Learner'])],
+        ]);
+
+        $update = [
+            'name' => $validated['name'],
+            'email_address' => $validated['email_address'],
+            'role_type' => $validated['role_type'],
+        ];
+        if (!empty($validated['password'])) {
+            $update['password'] = Hash::make($validated['password']);
+        }
+
+        $user->update($update);
+
+        return back()->with('success', 'User updated successfully.');
+    }
+}

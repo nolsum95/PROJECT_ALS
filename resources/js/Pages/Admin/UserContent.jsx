@@ -20,7 +20,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
 
 
-export default function UserContent({ users = {}, canCreate = false, title = 'User Management', routes = {} }) {
+export default function UserContent({ users = {}, canCreate = true, title = 'User Management', routes = {} }) {
 	const [search, setSearch] = useState('');
 	const [roleFilter, setRoleFilter] = useState('All');
 	const [openCreate, setOpenCreate] = useState(false);
@@ -81,15 +81,13 @@ export default function UserContent({ users = {}, canCreate = false, title = 'Us
 							<MenuItem value="Learner">Learner</MenuItem>
 						</TextField>
 					</Stack>
-					{canCreate && (
-						<Button
-							variant="contained"
-							sx={{ backgroundColor: '#22c55e', '&:hover': { backgroundColor: '#16a34a' } }}
-							onClick={handleOpenCreate}
-						>
-							+ New User
-						</Button>
-					)}
+					<Button
+						variant="contained"
+						sx={{ backgroundColor: '#22c55e', '&:hover': { backgroundColor: '#16a34a' } }}
+						onClick={handleOpenCreate}
+					>
+						+ New User
+					</Button>
 				</Toolbar>
 
 				<div className="admin-table-container">
@@ -110,7 +108,6 @@ export default function UserContent({ users = {}, canCreate = false, title = 'Us
 							)}
 							{filtered.map((u) => {
 								const showHref = typeof routes.show === 'function' ? routes.show(u.user_id) : routes.show;
-								const editHref = typeof routes.edit === 'function' ? routes.edit(u.user_id) : routes.edit;
 								return (
 									<TableRow key={u.user_id} hover>
 										<TableCell>{u.name ?? (u.email_address ? u.email_address.split('@')[0] : '—')}</TableCell>
@@ -127,15 +124,9 @@ export default function UserContent({ users = {}, canCreate = false, title = 'Us
 														<VisibilityIcon />
 													</IconButton>
 												)}
-												{editHref ? (
-													<IconButton size="small" sx={{ color: '#fbbf24' }} aria-label="Edit user" onClick={() => { setSelectedUser(u); setOpenEdit(true); }}>
-														<EditIcon />
-													</IconButton>
-												) : (
-													<IconButton size="small" disabled sx={{ opacity: 0.6 }} aria-label="Edit user">
-														<EditIcon />
-													</IconButton>
-												)}
+												<IconButton size="small" sx={{ color: '#fbbf24' }} aria-label="Edit user" onClick={() => { setSelectedUser(u); setOpenEdit(true); }}>
+													<EditIcon />
+												</IconButton>
 											</Stack>
 										</TableCell>
 									</TableRow>
