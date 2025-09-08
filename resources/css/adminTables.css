@@ -1,0 +1,58 @@
+/* Admin Table Styles - extracted from admin.css */
+
+.admin-table-container {
+    max-height: 520px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background-color: rgba(17,24,39,0.6);
+    overflow: auto;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.admin-table th, .admin-table td {
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    color: #e5e7eb;
+    padding: 6px 10px; /* Reduced padding for compact look */
+    background: none;
+}
+
+.admin-table-header {
+    background-color: #1e2533 !important; /* Solid, dark background */
+    font-weight: 600 !important;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.admin-table tr {
+    transition: background 0.2s;
+    border: 1px white !important;
+}
+
+.admin-table tr:hover {
+    background: rgba(59,130,246,0.08);
+}
+
+.admin-table .actions {
+    text-align: right;
+}
+
+@media (max-width: 768px) {
+    .admin-table-container {
+        border-radius: 0;
+    }
+    .admin-table th, .admin-table td {
+        padding: 5px 4px;
+    }
+}
+
+
+/* customized icon styles */
+.lockPerson-icon{
+    color: rgba(53, 176, 248, 0.625) !important;
+}
