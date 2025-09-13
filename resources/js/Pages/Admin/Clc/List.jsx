@@ -123,7 +123,7 @@ export default function ClcList({ clcs = [] }) {
 }
 
 ClcList.layout = (page) => (
-  <AdminLayout auth={page.props.auth} selectedSection="assign-clc">{page}</AdminLayout>
+  <AdminLayout auth={page.props.auth} selectedSection="clc-list">{page}</AdminLayout>
 );
 
 

@@ -1,19 +1,34 @@
 import { Link, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { showConfirm } from '@/Utils/sweetalert';
 import Sidebar from '@/Components/Admin/Sidebar.jsx';
+import MenuIcon from '@mui/icons-material/Menu';
 
-export default function AdminLayout({ children, title = 'Admin Dashboard', auth, selectedSection = 'dashboard', onSelectSection }) {
-	const [sidebarOpen, setSidebarOpen] = useState(false);
-	const [expandedSections, setExpandedSections] = useState(['learning']);
+export default function AdminLayout({ children, title = 'Admin Dashboard', auth, selectedSection = 'dashboard' }) {
+	const [sidebarOpen, setSidebarOpen] = useState(true);
+	const [expandedSections, setExpandedSections] = useState([selectedSection]);
+	const [currentSelectedSection, setCurrentSelectedSection] = useState(selectedSection);
 
 	const user = auth?.user;
 
-	const toggleSection = (section) => {
-		setExpandedSections((prev) =>
-			prev.includes(section) ? prev.filter((s) => s !== section) : [...prev, section]
-		);
-	};
+	// Sync sidebar state with section prop on navigation
+	useEffect(() => {
+		setCurrentSelectedSection(selectedSection);
+		if (["clc-list", "clc-cai-list", "clc-reports"].includes(selectedSection)) {
+			setExpandedSections(["clc"]);
+		} else if (["learning", "attendance"].includes(selectedSection)) {
+			setExpandedSections(["learning"]);
+		} else if (["dashboard", "users", "enrollments"].includes(selectedSection)) {
+			setExpandedSections([selectedSection]);
+		}
+	}, [selectedSection]);
+
+	useEffect(() => {
+		if (typeof window !== 'undefined') {
+			// Open by default on desktop, closed by default on tablet/mobile
+			setSidebarOpen(window.innerWidth > 1024);
+		}
+	}, []);
 
 	const handleLogout = async () => {
 		const result = await showConfirm('Are you sure you want to logout?', 'Logout Confirmation');
@@ -22,15 +37,33 @@ export default function AdminLayout({ children, title = 'Admin Dashboard', auth,
 		}
 	};
 
+	const containerClass = `admin-container ${sidebarOpen ? 'sidebar-open' : 'sidebar-collapsed'}`;
+
 	return (
-		<div className="admin-container">
+		<div className={containerClass}>
 			{/* Sidebar */}
 			<Sidebar
 				user={user}
-				selectedSection={selectedSection}
-				onSelectSection={onSelectSection ?? (() => {})}
+				selectedSection={currentSelectedSection}
+				onSelectSection={(s) => {
+					setCurrentSelectedSection(s);
+					// Expand the correct parent section for sub-menus
+					if (["clc-list", "clc-cai-list", "clc-reports"].includes(s)) {
+						setExpandedSections(["clc"]);
+					} else if (["learning", "attendance"].includes(s)) {
+						setExpandedSections(["learning"]);
+					} else if (["dashboard", "users", "enrollments"].includes(s)) {
+						setExpandedSections([s]);
+					}
+				}}
 				expandedSections={expandedSections}
-				onToggleSection={toggleSection}
+				onToggleSection={(section) => {
+					if (expandedSections.includes(section)) {
+						setExpandedSections(expandedSections.filter(s => s !== section));
+					} else {
+						setExpandedSections([section]);
+					}
+				}}
 				sidebarOpen={sidebarOpen}
 			/>
 
@@ -42,10 +75,9 @@ export default function AdminLayout({ children, title = 'Admin Dashboard', auth,
 						<button
 							className="menu-toggle"
 							onClick={() => setSidebarOpen(!sidebarOpen)}
+							aria-label="Toggle sidebar"
 						>
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-								<path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-							</svg>
+							<MenuIcon />
 						</button>
 					</div>
 

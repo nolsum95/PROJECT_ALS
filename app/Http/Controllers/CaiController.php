@@ -25,10 +25,16 @@ class CaiController extends Controller
         $caiUsers = User::where('role_type', 'CAI')->orderBy('name')
             ->get(['user_id','name','email_address']);
 
+        // return Inertia::render('Admin/Clc/Cai_list', [
+        //     'cais' => $cais,
+        //     'clcs' => $clcs,
+        //     'caiUsers' => $caiUsers,
+        // ]);
         return Inertia::render('Admin/Clc/Cai_list', [
             'cais' => $cais,
             'clcs' => $clcs,
             'caiUsers' => $caiUsers,
+            'section' => 'clc-cai-list',
         ]);
     }
 
@@ -63,7 +69,7 @@ class CaiController extends Controller
         // Create user if credentials provided
         if (empty($data['fk_userId']) && !empty($data['email_address']) && !empty($data['password'])) {
             $user = \App\Models\User::create([
-                'name' => ($data['firstname'].' '.$data['middlename'].' '.$data['lastname'].$data['']),
+                'name' => ($data['firstname'].' '.$data['middlename'].' '.$data['lastname']),
                 'email_address' => $data['email_address'],
                 'password' => \Illuminate\Support\Facades\Hash::make($data['password']),
                 'role_type' => 'CAI',
@@ -87,9 +93,9 @@ class CaiController extends Controller
      */
     public function show(int $id)
     {
-        $cai = Cai::with(['clc:clc_id,clc_name','learners:learner_id,fullname,assigned_cai'])
+        $cai = Cai::with(['clc:clc_id,clc_name','learners:learner_id,fullname,status,assigned_cai'])
             ->findOrFail($id);
-        return Inertia::render('Admin/Clc/Cai_show', [ 'cai' => $cai ]);
+        return Inertia::render('Admin/Clc/Details', [ 'cai' => $cai ]);
     }
 
     /**
@@ -118,6 +124,21 @@ class CaiController extends Controller
         Cai::where('cai_id', $id)->update($data);
 
         return back()->with('success', 'CAI updated successfully.');
+    }
+
+    /**
+     * Update CAI status.
+     */
+    public function updateStatus(Request $request, $caiId)
+    {
+        $request->validate([
+            'status' => ['required', 'string', 'max:255'],
+        ]);
+        $cai = Cai::findOrFail($caiId);
+        $cai->status = $request->input('status');
+        $cai->save();
+
+        return back()->with('success', 'CAI status updated.');
     }
 
     /**

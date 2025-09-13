@@ -10,14 +10,14 @@ import { useForm } from '@inertiajs/react';
 
 export default function EditCaiModal({ open, onClose, cai, clcs = [] }) {
 	const { data, setData, put, processing, errors } = useForm({
-		lastname: '', firstname: '', middlename: '', gender: 'Male', assigned_clc: '', status: 'Active'
+		lastname: '', firstname: '', middlename: '', gender: 'Male', assigned_clc: ''
 	});
 
 	useEffect(() => {
 		if (open && cai) {
 			setData({
 				lastname: cai.lastname ?? '', firstname: cai.firstname ?? '', middlename: cai.middlename ?? '',
-				gender: cai.gender ?? 'Male', assigned_clc: cai.assigned_clc ?? '', status: cai.status ?? 'Active'
+				gender: cai.gender ?? 'Male', assigned_clc: cai.assigned_clc ?? ''
 			});
 		}
 	}, [open, cai]);
@@ -50,10 +50,10 @@ export default function EditCaiModal({ open, onClose, cai, clcs = [] }) {
 							<MenuItem value="">Unassigned</MenuItem>
 							{clcs.map(clc => (<MenuItem key={clc.clc_id} value={clc.clc_id}>{clc.clc_name}</MenuItem>))}
 						</TextField>
-						<TextField select label="Status" value={data.status} onChange={(e) => setData('status', e.target.value)} size="small">
+						{/* <TextField select label="Status" value={data.status} onChange={(e) => setData('status', e.target.value)} size="small">
 							<MenuItem value="Active">Active</MenuItem>
 							<MenuItem value="Inactive">Inactive</MenuItem>
-						</TextField>
+						</TextField> */}
 					</div>
 				</DialogContent>
 				<DialogActions>

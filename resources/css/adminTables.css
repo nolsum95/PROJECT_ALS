@@ -3,8 +3,8 @@
 .admin-table-container {
     max-height: 520px;
     border-radius: 12px;
-    border: 1px solid rgba(255,255,255,0.08);
-    background-color: rgba(17,24,39,0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(17, 24, 39, 0.6);
     overflow: auto;
 }
 
@@ -14,15 +14,18 @@
     border-spacing: 0;
 }
 
-.admin-table th, .admin-table td {
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+.admin-table th,
+.admin-table td {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     color: #e5e7eb;
-    padding: 6px 10px; /* Reduced padding for compact look */
+    padding: 6px 10px;
+    /* Reduced padding for compact look */
     background: none;
 }
 
 .admin-table-header {
-    background-color: #1e2533 !important; /* Solid, dark background */
+    background-color: #1e2533 !important;
+    /* Solid, dark background */
     font-weight: 600 !important;
     position: sticky;
     top: 0;
@@ -35,7 +38,7 @@
 }
 
 .admin-table tr:hover {
-    background: rgba(59,130,246,0.08);
+    background: rgba(59, 130, 246, 0.08);
 }
 
 .admin-table .actions {
@@ -46,13 +49,53 @@
     .admin-table-container {
         border-radius: 0;
     }
-    .admin-table th, .admin-table td {
+
+    .admin-table th,
+    .admin-table td {
         padding: 5px 4px;
     }
 }
 
 
 /* customized icon styles */
-.lockPerson-icon{
+.lockPerson-icon {
     color: rgba(53, 176, 248, 0.625) !important;
+}
+
+
+/* Learner page filter styling */
+.learner-page-filters {
+    display: flex;
+    flex-direction: row;
+    gap: 12px; ; 
+    justify-content: space-between;
+    align-items: center; 
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+.learner-filters{
+    display: flex;
+    gap: 8;
+    align-items: center;
+    border: 1px solid  rgba(255,255,255,0.15);
+    flex-wrap: wrap;
+}
+.apply-btn{
+    padding: 8px 12px;
+    border: none;
+    border-radius: 8px;
+    background-color: #3b82f6;
+    color: #fff;
+}
+.search-filter{
+    min-width: 280px;
+    background: transparent ;
+    border: 1px solid  rgba(255,255,255,0.15);
+    color: #e5e6eb;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+.filter{
+    width: 100px;
+    
 }

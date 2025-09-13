@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout.jsx';
 import { useMemo, useState } from 'react';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -8,6 +8,8 @@ import TableCell from '@mui/material/TableCell';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
 import AddCaiModal from '@/Pages/Admin/modals/AddCaiModal.jsx';
 import EditCaiModal from '@/Pages/Admin/modals/EditCaiModal.jsx';
 import '../../../../css/adminTables.css';
@@ -27,6 +29,15 @@ export default function CaiList({ cais = [], clcs = [], caiUsers = [] }) {
 	const openAdd = () => { setAddOpen(true); };
 
 	const openEdit = (row) => { setEditing(row); setEditOpen(true); };
+
+	const handleStatusChange = (caiId, newStatus) => {
+		router.post(route('cai.updateStatus', caiId), {
+			status: newStatus,
+		}, {
+			preserveState: true,
+			preserveScroll: true,
+		});
+	};
 
 	return (
 		<>
@@ -57,7 +68,30 @@ export default function CaiList({ cais = [], clcs = [], caiUsers = [] }) {
 									<TableCell>{c.gender ?? '—'}</TableCell>
 									<TableCell>{c.clc?.clc_name ?? '—'}</TableCell>
 									<TableCell>{c.learners_count ?? 0}</TableCell>
-									<TableCell>{c.status ?? '—'}</TableCell>
+									<TableCell>
+										<FormControl size="small" sx={{ minWidth: 120 }}>
+											<Select
+												value={c.status || ''}
+												onChange={(e) => handleStatusChange(c.cai_id, e.target.value)}
+												displayEmpty
+												sx={{
+													color: '#e5e7eb',
+													'& .MuiOutlinedInput-notchedOutline': {
+														borderColor: 'rgba(255, 255, 255, 0)',
+													},
+													'&:hover .MuiOutlinedInput-notchedOutline': {
+														borderColor: 'rgba(255, 255, 255, 0)',
+													},
+													'&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+														borderColor: 'transparent',
+													},
+												}}
+											>
+												<MenuItem value="Active">Active</MenuItem>
+												<MenuItem value="Inactive">Inactive</MenuItem>
+											</Select>
+										</FormControl>
+									</TableCell>
 									<TableCell className="actions" style={{ whiteSpace: 'nowrap' }}>
 										<IconButton size="small" component={Link} href={route('cai.show', c.cai_id)} sx={{ color: '#93c5fd' }} aria-label="View details"><VisibilityIcon fontSize="small" /></IconButton>
 										<IconButton size="small" sx={{ color: '#fbbf24' }} aria-label="Edit CAI" onClick={() => openEdit(c)}><EditIcon fontSize="small" /></IconButton>

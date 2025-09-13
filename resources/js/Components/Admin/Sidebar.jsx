@@ -6,6 +6,13 @@ import EditNoteIcon from '@mui/icons-material/EditNote';
 import ApartmentIcon from '@mui/icons-material/Apartment';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import ArticleIcon from '@mui/icons-material/Article';
+import PeopleIcon from '@mui/icons-material/People';
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+
+
+
 
 export default function Sidebar({
 	user,
@@ -16,7 +23,17 @@ export default function Sidebar({
 	sidebarOpen,
 }) {
 	const displayName = user?.name || (user?.email_address ? user.email_address.split('@')[0] : 'Admin');
-	// const displayEmail = user?.email_address || '';
+	
+
+	// Only handle expansion/collapse on main section header click
+	const handleToggleSection = (section) => {
+		if (expandedSections.includes(section)) {
+			onToggleSection(section);
+		} else {
+			// Collapse all others, expand only this
+			onToggleSection(section, true);
+		}
+	};
 
 	return (
 		<div className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
@@ -31,23 +48,24 @@ export default function Sidebar({
 					<div
 						className={`nav-item ${selectedSection === 'dashboard' ? 'active' : ''}`}
 					>
-						<Link href={route('admin.dashboard')} className="nav-link" onClick={() => onSelectSection('dashboard')} style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+						<Link href={route('admin.dashboard')} className="nav-link">
 							<div className="nav-icon"><DashboardIcon fontSize="small" /></div>
 							<span className="nav-text">Overview</span>
 						</Link>
 
 					</div>
-					<Link href={route('admin.dashboard', { section: 'users' })} className="nav-link" style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-						<div className="nav-icon"><GroupIcon fontSize="small" /></div>
-						<span className="nav-text">Users</span>
-					</Link>
-
-
-
+					<div
+						className={`nav-item ${selectedSection === 'users' ? 'active' : ''}`}
+					>
+						<Link href={route('admin.dashboard', { section: 'users' })} className="nav-link">
+							<div className="nav-icon"><ManageAccountsIcon fontSize="small" /></div>
+							<span className="nav-text">Users</span>
+						</Link>
+					</div>
 					<div
 						className={`nav-item ${selectedSection === 'enrollments' ? 'active' : ''}`}
 					>
-						<Link href={route('admin.dashboard', { section: 'enrollments' })} className="nav-link" style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+						<Link href={route('admin.dashboard', { section: 'enrollments' })} className="nav-link">
 							<div className="nav-icon"><EditNoteIcon fontSize="small" /></div>
 							<span className="nav-text">Enrollment</span>
 						</Link>
@@ -56,8 +74,8 @@ export default function Sidebar({
 
 					{/* CLC Management */}
 					<div
-						className={`nav-item ${expandedSections.includes('clc') ? 'expanded' : ''}`}
-						onClick={() => onToggleSection('clc')}
+						className={`nav-item nav-link ${expandedSections.includes('clc') ? 'expanded' : ''}`}
+						onClick={() => handleToggleSection('clc')}
 					>
 						<div className="nav-icon"><ApartmentIcon fontSize="small" /></div>
 						<span className="nav-text">CLC Management</span>
@@ -65,66 +83,50 @@ export default function Sidebar({
 					</div>
 					{expandedSections.includes('clc') && (
 						<div className="sub-nav">
-							<Link href={route('clc.index')} className={`sub-nav-item`} onClick={() => onSelectSection('clc-list')}>
+							<Link href={route('clc.index')} className={`sub-nav-item ${selectedSection === 'clc-list' ? 'active' : ''}`}>
 								<div className="nav-icon"><ApartmentIcon fontSize="small" /></div>
 								CLCs
 							</Link>
-							{/* <Link href={route('clc.index')} className={`sub-nav-item`} onClick={() => onSelectSection('clc-assign')}>
-								<div className="nav-icon"><ApartmentIcon fontSize="small" /></div>
-								Assign CLC
-							</Link> */}
-							<Link href={route('cai.index')} className={`sub-nav-item`} onClick={() => onSelectSection('clc-cai-list')}>
+
+							<Link href={route('cai.index')} className={`sub-nav-item ${selectedSection === 'clc-cai-list' ? 'active' : ''}`}>
 								<div className="nav-icon"><GroupIcon fontSize="small" /></div>
 								CAIs
 							</Link>
-							<Link href={route('learner.index')} className={`sub-nav-item`} onClick={() => onSelectSection('clc-learner-list')}>
-								<div className="nav-icon"><MenuBookIcon fontSize="small" /></div>
-								Learners
-							</Link>
-							<Link href={route('clc.reports')} className={`sub-nav-item`} onClick={() => onSelectSection('clc-reports')}>
-								<div className="nav-icon"><AssessmentIcon fontSize="small" /></div>
-								Reports
-							</Link>
 						</div>
 					)}
-				</div>
 
-				<div className="nav-section">
-					<div
-						className={`nav-item ${expandedSections.includes('learning') ? 'expanded' : ''}`}
-						onClick={() => onToggleSection('learning')}
-					>
-						<div className="nav-icon"><MenuBookIcon fontSize="small" /></div>
-						<span className="nav-text">Learning Content</span>
-						<div className="nav-arrow">›</div>
-					</div>
-					<div
-						className={`nav-item ${selectedSection === 'users' ? 'active' : ''}`}
-					>
-
-					</div>
-					{/* {expandedSections.includes('learning') && (
-						<div className="sub-nav">
-							<Link href="#" className="sub-nav-item">
-								<div className="nav-icon"><MenuBookIcon fontSize="small" /></div>
-								Manage Subjects
-							</Link>
-							<Link href="#" className="sub-nav-item">
-								<div className="nav-icon"><GroupIcon fontSize="small" /></div>
-								Assign Subjects (CAIs)
-							</Link>
-							
+					<div className="nav-section">
+						<div
+							className={`nav-item nav-link ${expandedSections.includes('learning') ? 'expanded' : ''}`}
+							onClick={() => handleToggleSection('learning')}
+						>
+							<div className="nav-icon"><MenuBookIcon fontSize="small" /></div>
+							<span className="nav-text">Learning Content</span>
+							<div className="nav-arrow">›</div>
 						</div>
-					)} */}
-				</div>
+						{expandedSections.includes('learning') && (
+							<div className="sub-nav">
+								<Link href={route('learner.index')} className={`sub-nav-item ${selectedSection === 'learning' ? 'active' : ''}`}>
+									<div className="nav-icon"><PeopleIcon	 fontSize="small" /></div>
+									Learners
+								</Link>
+								<Link href={route('attendance.index')} className={`sub-nav-item ${selectedSection === 'attendance' ? 'active' : ''}`}>
+									<div className="nav-icon"><EventAvailableIcon fontSize="small" /></div>
+									Attendance
+								</Link>
 
-				<div className="nav-section">
-					<div className="nav-item">
+							</div>
+						)}
+					</div>
+					<div className="nav-item nav-link">
+						<div className="nav-icon"><ArticleIcon fontSize="small" /></div>
+						<span className="nav-text">Modules</span>
+					</div>
+					<div className="nav-item nav-link">
 						<div className="nav-icon"><AssessmentIcon fontSize="small" /></div>
 						<span className="nav-text">Evaluation</span>
 					</div>
-
-					<div className="nav-item">
+					<div className="nav-item nav-link">
 						<div className="nav-icon"><SummarizeIcon fontSize="small" /></div>
 						<span className="nav-text">Reports</span>
 					</div>

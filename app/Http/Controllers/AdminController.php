@@ -48,67 +48,94 @@ class AdminController extends Controller
             ];
         }
 
+        // --- Enrollment Filtering ---
+        $enrollmentQuery = \App\Models\EnrollmentAlpha::query()
+            ->leftJoin('enrollment_address_tb as addr', 'addr.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
+            ->leftJoin('enrollment_guardian_tb as gu', 'gu.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
+            ->leftJoin('enrollment_information_tb as info', 'info.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
+            ->leftJoin('enrollment_pwd_tb as pwd', 'pwd.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
+            ->leftJoin('household_status_tb as hh', 'hh.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
+            ->leftJoin('distance_availability_tb as clc', 'clc.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
+            ->leftJoin('user_tb as u', 'u.email_address', '=', 'enrollment_alpha_tb.email_address');
+
+        // Filter by status
+        $status = $request->query('status');
+        if ($status && $status !== 'All') {
+            $enrollmentQuery->where('enrollment_alpha_tb.enrollee_status', $status);
+        }
+
+        // Filter by search
+        $search = $request->query('search');
+        if ($search) {
+            $enrollmentQuery->where(function($q) use ($search) {
+                $q->where('enrollment_alpha_tb.firstname', 'like', "%$search%")
+                  ->orWhere('enrollment_alpha_tb.middlename', 'like', "%$search%")
+                  ->orWhere('enrollment_alpha_tb.lastname', 'like', "%$search%")
+                  ->orWhere('enrollment_alpha_tb.email_address', 'like', "%$search%")
+                  ->orWhere('addr.cur_barangay', 'like', "%$search%")
+                  ->orWhere('addr.cur_municipality', 'like', "%$search%")
+                  ->orWhere('enrollment_alpha_tb.mobile_no', 'like', "%$search%")
+                  ->orWhere('enrollment_alpha_tb.birthdate', 'like', "%$search%")
+                  ->orWhere('enrollment_alpha_tb.enrollee_status', 'like', "%$search%")
+                  ;
+            });
+        }
+
+        $enrollments = $enrollmentQuery
+            ->select([
+                'enrollment_alpha_tb.enrollment_id as id',
+                'enrollment_alpha_tb.firstname',
+                'enrollment_alpha_tb.middlename',
+                'enrollment_alpha_tb.lastname',
+                'enrollment_alpha_tb.mobile_no',
+                'enrollment_alpha_tb.email_address',
+                'enrollment_alpha_tb.birthdate',
+                'enrollment_alpha_tb.gender',
+                'enrollment_alpha_tb.extension_name',
+                'enrollment_alpha_tb.religion',
+                'enrollment_alpha_tb.mother_tongue',
+                'enrollment_alpha_tb.civil_status',
+                'enrollment_alpha_tb.date_enrolled',
+                'enrollment_alpha_tb.enrollee_status',
+                'enrollment_alpha_tb.learner_ref_no',
+                // Address
+                'addr.cur_house_no',
+                'addr.cur_streetname',
+                'addr.cur_barangay',
+                'addr.cur_municipality',
+                'addr.cur_province',
+                'addr.cur_zip_code',
+                'addr.perm_house_no',
+                'addr.perm_streetname',
+                'addr.perm_barangay',
+                'addr.perm_municipality',
+                'addr.perm_province',
+                'addr.perm_zip_code',
+                // Guardian
+                'gu.pa_lastname', 'gu.pa_firstname', 'gu.pa_middlename', 'gu.pa_occupation',
+                'gu.ma_lastname', 'gu.ma_firstname', 'gu.ma_middlename', 'gu.ma_occupation',
+                // Education info
+                'info.lastLevelCompleted', 'info.nonCompletionReason', 'info.custom_reason', 'info.hasAttendedAls', 'info.alsProgramAttended', 'info.hasCompletedAls', 'info.alsNonCompletedReason',
+                // PWD
+                'pwd.is_pwd', 'pwd.disability_name', 'pwd.spec_health_prob', 'pwd.visual_impairment',
+                // Household status
+                'hh.isIndegenous', 'hh.ipCommunityName', 'hh.is4PsMember', 'hh.household_Id_4Ps',
+                // CLC accessibility
+                'clc.distance_clc_km', 'clc.travel_hours_minutes', 'clc.transport_mode', 'clc.mon', 'clc.tue', 'clc.wed', 'clc.thur', 'clc.fri', 'clc.sat', 'clc.sun',
+                // User existence flag (prefer denormalized column when present)
+                DB::raw('COALESCE(enrollment_alpha_tb.created_user_id, u.user_id) as created_user_id'),
+            ])
+            ->orderBy('enrollment_alpha_tb.enrollment_id', 'desc')
+            ->paginate(10)
+            ->appends($request->only(['status', 'search', 'section']));
+
         return Inertia::render('Admin/Dashboard', [
             'stats' => $stats,
             'users' => User::select('user_id', 'name', 'email_address', 'role_type')
                 ->whereIn('role_type', ['CAI', 'Learner'])
                 ->orderBy('user_id', 'desc')
                 ->paginate(10),
-            'enrollments' => \App\Models\EnrollmentAlpha::query()
-                ->leftJoin('enrollment_address_tb as addr', 'addr.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
-                ->leftJoin('enrollment_guardian_tb as gu', 'gu.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
-                ->leftJoin('enrollment_information_tb as info', 'info.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
-                ->leftJoin('enrollment_pwd_tb as pwd', 'pwd.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
-                ->leftJoin('household_status_tb as hh', 'hh.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
-                ->leftJoin('distance_availability_tb as clc', 'clc.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
-                // Persist whether a user exists for this enrollee based on email match
-                ->leftJoin('user_tb as u', 'u.email_address', '=', 'enrollment_alpha_tb.email_address')
-                ->select([
-                    'enrollment_alpha_tb.enrollment_id as id',
-                    'enrollment_alpha_tb.firstname',
-                    'enrollment_alpha_tb.middlename',
-                    'enrollment_alpha_tb.lastname',
-                    'enrollment_alpha_tb.mobile_no',
-                    'enrollment_alpha_tb.email_address',
-                    'enrollment_alpha_tb.birthdate',
-                    'enrollment_alpha_tb.gender',
-                    'enrollment_alpha_tb.extension_name',
-                    'enrollment_alpha_tb.religion',
-                    'enrollment_alpha_tb.mother_tongue',
-                    'enrollment_alpha_tb.civil_status',
-                    'enrollment_alpha_tb.date_enrolled',
-                    'enrollment_alpha_tb.enrollee_status',
-                    'enrollment_alpha_tb.learner_ref_no',
-                    // Address
-                    'addr.cur_house_no',
-                    'addr.cur_streetname',
-                    'addr.cur_barangay',
-                    'addr.cur_municipality',
-                    'addr.cur_province',
-                    'addr.cur_zip_code',
-                    'addr.perm_house_no',
-                    'addr.perm_streetname',
-                    'addr.perm_barangay',
-                    'addr.perm_municipality',
-                    'addr.perm_province',
-                    'addr.perm_zip_code',
-                    // Guardian
-                    'gu.pa_lastname', 'gu.pa_firstname', 'gu.pa_middlename', 'gu.pa_occupation',
-                    'gu.ma_lastname', 'gu.ma_firstname', 'gu.ma_middlename', 'gu.ma_occupation',
-                    // Education info
-                    'info.lastLevelCompleted', 'info.nonCompletionReason', 'info.custom_reason', 'info.hasAttendedAls', 'info.alsProgramAttended', 'info.hasCompletedAls', 'info.alsNonCompletedReason',
-                    // PWD
-                    'pwd.is_pwd', 'pwd.disability_name', 'pwd.spec_health_prob', 'pwd.visual_impairment',
-                    // Household status
-                    'hh.isIndegenous', 'hh.ipCommunityName', 'hh.is4PsMember', 'hh.household_Id_4Ps',
-                    // CLC accessibility
-                    'clc.distance_clc_km', 'clc.travel_hours_minutes', 'clc.transport_mode', 'clc.mon', 'clc.tue', 'clc.wed', 'clc.thur', 'clc.fri', 'clc.sat', 'clc.sun',
-                    // User existence flag (prefer denormalized column when present)
-                    DB::raw('COALESCE(enrollment_alpha_tb.created_user_id, u.user_id) as created_user_id'),
-                ])
-                ->orderBy('enrollment_alpha_tb.enrollment_id', 'desc')
-                ->paginate(10),
-            // Lists for assignment controls
+            'enrollments' => $enrollments,
             'lists' => [
                 'clcs' => \App\Models\Clc::orderBy('clc_name')->get(['clc_id','clc_name']),
                 'cais' => \App\Models\Cai::orderBy('lastname')->get(['cai_id','firstname','middlename','lastname','assigned_clc']),
@@ -120,6 +147,10 @@ class AdminController extends Controller
                 'info' => session('info'),
             ],
             'section' => $section,
+            'filters' => [
+                'status' => $status,
+                'search' => $search,
+            ],
         ]);
     }
 

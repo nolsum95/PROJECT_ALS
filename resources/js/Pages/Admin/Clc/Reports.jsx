@@ -48,7 +48,7 @@ export default function ClcReports({ byClcLearners = {}, byClcCais = {}, byBaran
 }
 
 ClcReports.layout = (page) => (
-  <AdminLayout auth={page.props.auth} selectedSection="assign-clc">{page}</AdminLayout>
+  <AdminLayout auth={page.props.auth} selectedSection="clc-reports">{page}</AdminLayout>
 );
 
 

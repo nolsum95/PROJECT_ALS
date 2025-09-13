@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Paper from '@mui/material/Paper';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -24,9 +24,9 @@ import PersonAddAlt1Icon from '@mui/icons-material/PersonAddAlt1';
 import LockPersonIcon from '@mui/icons-material/LockPerson';
 import EnrolledUser from './modals/EnrolledUser.jsx';
 
-export default function EnrollmentContent({ enrollments = {}, lists = {}, canCreate = false, title = 'Enrollment Management', routes = {} }) {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+export default function EnrollmentContent({ enrollments = {}, lists = {}, canCreate = false, title = 'Enrollment Management', routes = {}, filters = {} }) {
+  const [search, setSearch] = useState(filters.search || '');
+  const [statusFilter, setStatusFilter] = useState(filters.status || 'All');
   const [openInfo, setOpenInfo] = useState(false);
   const [selectedEnrollee, setSelectedEnrollee] = useState(null);
 
@@ -39,7 +39,7 @@ export default function EnrollmentContent({ enrollments = {}, lists = {}, canCre
       id: e.id,
       learner: [e.firstname, e.middlename, e.lastname].filter(Boolean).join(' '),
       address: [e.cur_barangay, e.cur_municipality].filter(Boolean).join(', '),
-      contact: e.mobile_no,
+      contact: e.email_address,
       status: e.enrollee_status,
       date: e.date_enrolled,
       alpha: e,
@@ -50,7 +50,7 @@ export default function EnrollmentContent({ enrollments = {}, lists = {}, canCre
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((e) => {
-      const hay = `${e.learner ?? ''} ${e.address ?? ''} ${e.contact ?? ''} ${e.status ?? ''} ${e.date ?? ''}`.toLowerCase();
+      const hay = `${e.learner ?? ''} ${e.address ?? ''} ${e.email_address ?? ''} ${e.status ?? ''} ${e.date ?? ''}`.toLowerCase();
       const matchesQuery = q ? hay.includes(q) : true;
       const matchesStatus = statusFilter === 'All' ? true : ((e.status ?? '').toLowerCase() === statusFilter.toLowerCase());
       return matchesQuery && matchesStatus;
@@ -58,7 +58,15 @@ export default function EnrollmentContent({ enrollments = {}, lists = {}, canCre
   }, [rows, search, statusFilter]);
 
   const handlePageChange = (url) => {
-    if (url) router.get(url, {}, { preserveState: true, preserveScroll: true });
+    if (url) {
+      // Ensure section=enrollments is always present
+      let newUrl = url;
+      if (!/section=/.test(url)) {
+        const hasQuery = url.includes('?');
+        newUrl = url + (hasQuery ? '&' : '?') + 'section=enrollments';
+      }
+      router.get(newUrl, {}, { preserveState: true, preserveScroll: true });
+    }
   };
 
   // Update Status Dialog
@@ -101,6 +109,51 @@ export default function EnrollmentContent({ enrollments = {}, lists = {}, canCre
     }
   };
 
+  // Send filter/search to backend and reset to page 1
+  useEffect(() => {
+    // Only trigger on mount if filters are present
+    setSearch(filters.search || '');
+    setStatusFilter(filters.status || 'All');
+  }, [filters.search, filters.status]);
+
+  const applyFilters = (newStatus, newSearch) => {
+    router.get(route('admin.dashboard', { section: 'enrollments' }), {
+      page: 1,
+      status: newStatus !== undefined ? newStatus : statusFilter,
+      search: newSearch !== undefined ? newSearch : search,
+      section: 'enrollments',
+    }, { preserveState: true, preserveScroll: true });
+  };
+
+  // When status filter changes
+  const handleStatusChange = (e) => {
+    const value = e.target.value;
+    setStatusFilter(value);
+    applyFilters(value, search);
+  };
+
+  // When search changes (debounced)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      applyFilters(statusFilter, search);
+    }, 400);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line
+  }, [search]);
+
+  // Polling: refetch enrollments every 5 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Re-fetch the current page, preserving filters and scroll
+      router.reload({
+        only: ['enrollments'],
+        preserveState: true,
+        preserveScroll: true,
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="dashboard-content">
         <Toolbar sx={{ px: 0, pb: 2, display: 'flex', gap: 2, justifyContent: 'space-between', flexWrap: 'wrap' }}>
@@ -119,7 +172,7 @@ export default function EnrollmentContent({ enrollments = {}, lists = {}, canCre
               variant="outlined"
               size="small"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={handleStatusChange}
               SelectProps={{
                 MenuProps: {
                   PaperProps: {

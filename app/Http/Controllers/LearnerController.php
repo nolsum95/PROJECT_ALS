@@ -35,11 +35,23 @@ class LearnerController extends Controller
         $cais = Cai::orderBy('lastname')->get(['cai_id','firstname','middlename','lastname']);
         $clcs = Clc::orderBy('clc_name')->get(['clc_id','clc_name']);
 
-        return Inertia::render('Admin/Clc/Learner_list', [
+        return Inertia::render('Admin/Learner/Learner_list', [
             'learners' => $learners,
             'cais' => $cais,
             'clcs' => $clcs,
             'filters' => [ 'cai' => $filterCai, 'clc' => $filterClc ],
         ]);
+    }
+
+    public function updateStatus(Request $request, $learnerId)
+    {
+        $request->validate([
+            'status' => ['required', 'string', 'max:255'],
+        ]);
+        $learner = Learner::findOrFail($learnerId);
+        $learner->status = $request->input('status');
+        $learner->save();
+
+        return back()->with('success', 'Learner status updated.');
     }
 }

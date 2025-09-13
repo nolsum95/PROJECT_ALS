@@ -51,9 +51,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/admin/cais', [CaiController::class, 'store'])->name('cai.store');
     Route::put('/admin/cais/{caiId}', [CaiController::class, 'update'])->name('cai.update');
     Route::get('/admin/cais/{caiId}', [CaiController::class, 'show'])->name('cai.show');
+    Route::post('/admin/cais/{caiId}/status', [CaiController::class, 'updateStatus'])->name('cai.updateStatus');
 
     // Learners
     Route::get('/admin/learners', [LearnerController::class, 'index'])->name('learner.index');
+    Route::post('/admin/learners/{learnerId}/status', [LearnerController::class, 'updateStatus'])->name('learners.updateStatus');
+
+    // Attendance
+    Route::get('/admin/attendance', [\App\Http\Controllers\AttendanceController::class, 'index'])->name('attendance.index');
+    Route::post('/admin/attendance', [\App\Http\Controllers\AttendanceController::class, 'store'])->name('attendance.store');
+    Route::put('/admin/attendance/{attendanceId}', [\App\Http\Controllers\AttendanceController::class, 'update'])->name('attendance.update');
+    Route::delete('/admin/attendance/{attendanceId}', [\App\Http\Controllers\AttendanceController::class, 'destroy'])->name('attendance.destroy');
 
     // Users (API endpoints for modals)
     Route::post('/admin/users', [UserController::class, 'store'])->name('users.store');

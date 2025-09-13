@@ -11,6 +11,18 @@ export default function AdminDashboard({ auth, stats, flash, users = [], enrollm
     const [expandedSections, setExpandedSections] = useState([section]);
     const [selectedSection, setSelectedSection] = useState(section);
 
+    // Sync sidebar state with section prop on navigation
+    useEffect(() => {
+        setSelectedSection(section);
+        if (["clc-list", "clc-cai-list", "clc-reports"].includes(section)) {
+            setExpandedSections(["clc"]);
+        } else if (["learning", "attendance"].includes(section)) {
+            setExpandedSections(["learning"]);
+        } else if (["dashboard", "users", "enrollments"].includes(section)) {
+            setExpandedSections([section]);
+        }
+    }, [section]);
+
     const user = auth?.user;
 
     useEffect(() => {
@@ -85,14 +97,24 @@ export default function AdminDashboard({ auth, stats, flash, users = [], enrollm
                     user={user}
                     selectedSection={selectedSection}
                     onSelectSection={(s) => {
-                        // If a main nav item is clicked, collapse all expanded sections
-                        if (["dashboard", "users", "enrollments"].includes(s)) {
+                        setSelectedSection(s);
+                        // Expand the correct parent section for sub-menus
+                        if (["clc-list", "clc-cai-list", "clc-reports"].includes(s)) {
+                            setExpandedSections(["clc"]);
+                        } else if (["learning", "attendance"].includes(s)) {
+                            setExpandedSections(["learning"]);
+                        } else if (["dashboard", "users", "enrollments"].includes(s)) {
                             setExpandedSections([s]);
                         }
-                        setSelectedSection(s);
                     }}
                     expandedSections={expandedSections}
-                    onToggleSection={toggleSection}
+                    onToggleSection={(section) => {
+                        if (expandedSections.includes(section)) {
+                            setExpandedSections(expandedSections.filter(s => s !== section));
+                        } else {
+                            setExpandedSections([section]);
+                        }
+                    }}
                     sidebarOpen={sidebarOpen}
                 />
                 

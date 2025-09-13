@@ -19,6 +19,7 @@ class ClcController extends Controller
 
         return Inertia::render('Admin/Clc/List', [
             'clcs' => $clcs,
+            'section' => 'clc-list',
         ]);
     }
 
@@ -96,10 +97,16 @@ class ClcController extends Controller
             ->groupBy('assigned_clc')->pluck('total','assigned_clc');
         $byBarangay = Clc::selectRaw('barangay, COUNT(*) as total')->groupBy('barangay')->pluck('total','barangay');
 
+        // return Inertia::render('Admin/Clc/Reports', [
+        //     'byClcLearners' => $byClcLearners,
+        //     'byClcCais' => $byClcCais,
+        //     'byBarangay' => $byBarangay,
+        // ]);
         return Inertia::render('Admin/Clc/Reports', [
             'byClcLearners' => $byClcLearners,
             'byClcCais' => $byClcCais,
             'byBarangay' => $byBarangay,
+            'section' => 'clc-reports',
         ]);
     }
 
