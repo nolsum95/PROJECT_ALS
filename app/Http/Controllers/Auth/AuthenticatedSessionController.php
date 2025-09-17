@@ -39,6 +39,10 @@ class AuthenticatedSessionController extends Controller
             return redirect()->intended(route('admin.dashboard', absolute: false))
                 ->with('success', 'Welcome back! You have successfully logged in.');
         }
+        if ($user->role_type === 'Cai') {
+            return redirect()->intended(route('cai.dashboard', absolute: false))
+                ->with('success', 'Welcome back! You have successfully logged in as CAI.');
+        }
 
         return redirect()->intended(route('dashboard', absolute: false))
             ->with('success', 'Welcome back! You have successfully logged in.');

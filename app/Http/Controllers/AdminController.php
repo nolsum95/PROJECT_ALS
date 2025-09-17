@@ -56,7 +56,8 @@ class AdminController extends Controller
             ->leftJoin('enrollment_pwd_tb as pwd', 'pwd.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
             ->leftJoin('household_status_tb as hh', 'hh.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
             ->leftJoin('distance_availability_tb as clc', 'clc.fk_enrollment_id', '=', 'enrollment_alpha_tb.enrollment_id')
-            ->leftJoin('user_tb as u', 'u.email_address', '=', 'enrollment_alpha_tb.email_address');
+            ->leftJoin('user_tb as u', 'u.email_address', '=', 'enrollment_alpha_tb.email_address')
+            ->leftJoin('cai_tb as cai', 'cai.cai_id', '=', 'enrollment_alpha_tb.fk_cai_id');
 
         // Filter by status
         $status = $request->query('status');
@@ -98,6 +99,11 @@ class AdminController extends Controller
                 'enrollment_alpha_tb.date_enrolled',
                 'enrollment_alpha_tb.enrollee_status',
                 'enrollment_alpha_tb.learner_ref_no',
+                'enrollment_alpha_tb.fk_cai_id',
+                // CAI info for tracking
+                'cai.firstname as cai_firstname',
+                'cai.middlename as cai_middlename', 
+                'cai.lastname as cai_lastname',
                 // Address
                 'addr.cur_house_no',
                 'addr.cur_streetname',
@@ -122,8 +128,8 @@ class AdminController extends Controller
                 'hh.isIndegenous', 'hh.ipCommunityName', 'hh.is4PsMember', 'hh.household_Id_4Ps',
                 // CLC accessibility
                 'clc.distance_clc_km', 'clc.travel_hours_minutes', 'clc.transport_mode', 'clc.mon', 'clc.tue', 'clc.wed', 'clc.thur', 'clc.fri', 'clc.sat', 'clc.sun',
-                // User existence flag (prefer denormalized column when present)
-                DB::raw('COALESCE(enrollment_alpha_tb.created_user_id, u.user_id) as created_user_id'),
+                // User creation tracking
+                'enrollment_alpha_tb.created_user_id',
             ])
             ->orderBy('enrollment_alpha_tb.enrollment_id', 'desc')
             ->paginate(10)
@@ -137,8 +143,13 @@ class AdminController extends Controller
                 ->paginate(10),
             'enrollments' => $enrollments,
             'lists' => [
-                'clcs' => \App\Models\Clc::orderBy('clc_name')->get(['clc_id','clc_name']),
-                'cais' => \App\Models\Cai::orderBy('lastname')->get(['cai_id','firstname','middlename','lastname','assigned_clc']),
+                'clcs' => \App\Models\Clc::withCount(['cais', 'learners'])
+                    ->orderBy('clc_name')->get(['clc_id','clc_name','barangay']),
+                'cais' => \App\Models\Cai::with(['clc:clc_id,clc_name'])
+                    ->withCount('learners')
+                    ->orderBy('lastname')->get(['cai_id','firstname','middlename','lastname','gender','assigned_clc','status']),
+                'learners' => \App\Models\Learner::with(['cai:cai_id,firstname,lastname', 'clc:clc_id,clc_name'])
+                    ->orderBy('fullname')->get(['learner_id','fullname','status','assigned_cai','assigned_clc']),
             ],
             'flash' => [
                 'success' => session('success'),
@@ -156,6 +167,7 @@ class AdminController extends Controller
 
     /**
      * Update an enrollee's status.
+     * Note: Admin updates do NOT modify fk_cai_id to preserve CAI tracking history
      */
     public function updateEnrollmentStatus(\Illuminate\Http\Request $request, int $enrollmentId)
     {
@@ -163,6 +175,7 @@ class AdminController extends Controller
             'status' => ['required', \Illuminate\Validation\Rule::in(['Applied', 'Pre-enrolled', 'Enrolled'])],
         ]);
 
+        // Admin updates only change status, preserving fk_cai_id for tracking
         $affected = \App\Models\EnrollmentAlpha::where('enrollment_id', $enrollmentId)
             ->update(['enrollee_status' => $validated['status']]);
 

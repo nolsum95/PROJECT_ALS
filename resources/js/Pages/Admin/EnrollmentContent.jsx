@@ -44,6 +44,8 @@ export default function EnrollmentContent({ enrollments = {}, lists = {}, canCre
       date: e.date_enrolled,
       alpha: e,
       created_user_id: e.created_user_id,
+      fk_cai_id: e.fk_cai_id,
+      cai_name: [e.cai_firstname, e.cai_middlename, e.cai_lastname].filter(Boolean).join(' '),
     }));
   }, [enrollments]);
 
@@ -193,10 +195,11 @@ export default function EnrollmentContent({ enrollments = {}, lists = {}, canCre
         <Table stickyHeader size="medium" aria-label="enrollments table" className="admin-table">
             <TableHead>
               <TableRow>
-              <TableCell className="admin-table-header">Enrollees</TableCell>
+              <TableCell className="admin-table-header">Learner Name</TableCell>
               <TableCell className="admin-table-header">Address</TableCell>
               <TableCell className="admin-table-header">Contact</TableCell>
               <TableCell className="admin-table-header">Status</TableCell>
+              <TableCell className="admin-table-header">Updated By</TableCell>
               <TableCell className="admin-table-header">Date Enroll</TableCell>
               <TableCell align="right" className="admin-table-header actions">Actions</TableCell>
               </TableRow>
@@ -204,7 +207,7 @@ export default function EnrollmentContent({ enrollments = {}, lists = {}, canCre
             <TableBody>
               {filtered.length === 0 && (
                 <TableRow>
-                <TableCell colSpan={6} style={{ opacity: 0.8 }}>No enrollments found.</TableCell>
+                <TableCell colSpan={7} style={{ opacity: 0.8 }}>No enrollments found.</TableCell>
                 </TableRow>
               )}
             {filtered.map((e) => {
@@ -212,13 +215,24 @@ export default function EnrollmentContent({ enrollments = {}, lists = {}, canCre
               const locallyCreated = createdUserIds.has(e.id);
               const hasServerUser = !!e.created_user_id;
               const showCreateIcon = isEnrolled && !hasServerUser && !locallyCreated;
-              const showLockIcon = isEnrolled && (hasServerUser || locallyCreated);
+              const showLockIcon = hasServerUser || locallyCreated;
               return (
                 <TableRow key={e.id} hover>
                   <TableCell>{e.learner ?? '—'}</TableCell>
                   <TableCell>{e.address ?? '—'}</TableCell>
                   <TableCell>{e.contact ?? '—'}</TableCell>
                    <TableCell>{e.status ?? '—'}</TableCell>
+                  <TableCell>
+                    {e.fk_cai_id && e.cai_name ? (
+                      <span style={{ fontSize: '0.875rem', color: '#666' }}>
+                        CAI: {e.cai_name}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '0.875rem', color: '#999' }}>
+                        —
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>{e.date ?? '—'}</TableCell>
                   <TableCell align="right" className="actions">
                     <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>

@@ -1,6 +1,5 @@
 
 
-
 /* Admin Dashboard Styles - Dark Theme */
 .admin-container {
     min-height: 100vh;
@@ -9,18 +8,142 @@
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Sidebar */
-.admin-sidebar {
+/* Admin Layout Specific Styles */
+.admin-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.admin-main-content {
+  flex-grow: 1;
+  background-color: #0f172a;
+  min-height: 100vh;
+}
+
+.admin-app-bar {
+  background-color: #182f54 !important;
+  color: #fff !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+.admin-page-content {
+  margin-top: 64px;
+  padding: 0;
+}
+
+/* Admin Sidebar Content */
+.admin-sidebar-header {
+  padding: 15px !important;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 64px;
+  background-color: #182f54;
+  border-bottom: 1px solid #334155;
+}
+
+.admin-sidebar-avatar {
+  width: 48px;
+  height: 48px;
+  background-color: #dadada;
+  font-size: 1.2rem;
+}
+
+.admin-sidebar-user-info {
+  margin-left: 16px;
+  overflow: hidden;
+}
+
+
+.admin-nav-button {
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 8px;
+  color: #cbd5e1;
+}
+
+.admin-nav-button.active {
+  background-color: #3b82f6 !important;
+  color: #fff !important;
+}
+
+.admin-nav-button:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+
+.admin-nav-button.active:hover {
+  background-color: #2563eb !important;
+}
+
+.admin-nav-icon {
+  min-width: 0;
+  margin-right: 24px;
+  justify-content: center;
+  color: inherit;
+}
+
+.admin-nav-text {
+  font-weight: 400;
+  color: inherit;
+}
+
+.admin-nav-text.active {
+  font-weight: 600;
+}
+
+.admin-expandable-item {
+  margin-bottom: 4px;
+}
+
+.admin-expandable-button {
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 8px;
+  color: #cbd5e1;
+  justify-content: flex-start;
+}
+
+.admin-expandable-button:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+
+.admin-sub-nav {
+  padding-left: 20px;
+}
+
+.admin-sub-nav-button {
+  min-height: 40px;
+  padding: 0 20px;
+  border-radius: 6px;
+  color: #94a3b8;
+  font-size: 0.875rem;
+}
+
+.admin-sub-nav-button.active {
+  background-color: #3b82f6 !important;
+  color: #fff !important;
+}
+
+.admin-sub-nav-button:hover {
+  background-color: rgba(255,255,255,0.05);
+}
+
+.admin-sub-nav-button.active:hover {
+  background-color: #2563eb !important;
+}
+
+/* Sidebar - Disabled for Material-UI layout */
+/* .admin-sidebar {
     width: 250px;
-    background: #1e293b;
+    background: #182f54;
     border-right: 1px solid #334155;
     display: flex;
     flex-direction: column;
     position: fixed;
     height: 100vh;
     z-index: 1000;
-    transition: transform 0.3s ease; /* animate open/close at all widths */
-}
+    transition: transform 0.3s ease;
+} */
 
 /* Collapsed sidebar for all breakpoints when container has sidebar-collapsed */
 .admin-container.sidebar-collapsed .admin-sidebar {
@@ -178,16 +301,16 @@
 /* Main Content */
 .admin-main {
     flex: 1;
-    margin-left: 250px;
+    /* margin-left: 250px; */
     background: #0f172a;
     min-height: 100vh;
-    transition: margin 0.3s ease; /* smooth shift when collapsing */
+    transition: margin 0.3s ease;
 }
 
-/* Remove left margin when collapsed (all widths) */
-.admin-container.sidebar-collapsed .admin-main {
+/* Remove left margin when collapsed (all widths) - Disabled */
+/* .admin-container.sidebar-collapsed .admin-main {
     margin-left: 0;
-}
+} */
 
 /* Header */
 .admin-header {

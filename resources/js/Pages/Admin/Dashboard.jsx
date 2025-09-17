@@ -3,8 +3,20 @@ import { useState, useEffect } from 'react';
 import { showConfirm, showSuccess, showError, showWarning, showInfo } from '@/Utils/sweetalert';
 import UserContent from './UserContent.jsx';
 import EnrollmentContent from './EnrollmentContent.jsx';
-import Sidebar from '@/Components/Admin/Sidebar.jsx';
-import MenuIcon from '@mui/icons-material/Menu';
+import ClcList from './Clc/List.jsx';
+import ClcCaiList from './Clc/Cai_list.jsx';
+import ClcDetails from './Clc/Details.jsx';
+import ClcReports from './Clc/Reports.jsx';
+import LearnerList from './Learner/Learner_list.jsx';
+import AttendanceList from './Attendance/Attendance_list.jsx';
+import AdminLayout from '@/Layouts/AdminLayout';
+import '../../../css/dashboard.css';
+import {
+    Person as PersonIcon,
+    School as SchoolIcon,
+    Assignment as AssignmentIcon,
+    Business as BusinessIcon
+} from '@mui/icons-material';
 
 export default function AdminDashboard({ auth, stats, flash, users = [], enrollments = {}, lists = {}, section = 'dashboard' }) {
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -14,11 +26,11 @@ export default function AdminDashboard({ auth, stats, flash, users = [], enrollm
     // Sync sidebar state with section prop on navigation
     useEffect(() => {
         setSelectedSection(section);
-        if (["clc-list", "clc-cai-list", "clc-reports"].includes(section)) {
+        if (["clc-list", "clc-cai-list", "clc-details", "clc-reports"].includes(section)) {
             setExpandedSections(["clc"]);
-        } else if (["learning", "attendance"].includes(section)) {
+        } else if (["learner-list", "attendance-list"].includes(section)) {
             setExpandedSections(["learning"]);
-        } else if (["dashboard", "users", "enrollments"].includes(section)) {
+        } else if (["dashboard", "users", "enrollments", "modules", "evaluation", "reports"].includes(section)) {
             setExpandedSections([section]);
         }
     }, [section]);
@@ -88,110 +100,126 @@ export default function AdminDashboard({ auth, stats, flash, users = [], enrollm
 
     const containerClass = `admin-container ${sidebarOpen ? 'sidebar-open' : 'sidebar-collapsed'}`;
 
+
     return (
         <>
-          
-            <div className={containerClass}>
-                {/* Sidebar */}
-                <Sidebar
-                    user={user}
-                    selectedSection={selectedSection}
-                    onSelectSection={(s) => {
-                        setSelectedSection(s);
-                        // Expand the correct parent section for sub-menus
-                        if (["clc-list", "clc-cai-list", "clc-reports"].includes(s)) {
-                            setExpandedSections(["clc"]);
-                        } else if (["learning", "attendance"].includes(s)) {
-                            setExpandedSections(["learning"]);
-                        } else if (["dashboard", "users", "enrollments"].includes(s)) {
-                            setExpandedSections([s]);
-                        }
-                    }}
-                    expandedSections={expandedSections}
-                    onToggleSection={(section) => {
-                        if (expandedSections.includes(section)) {
-                            setExpandedSections(expandedSections.filter(s => s !== section));
-                        } else {
-                            setExpandedSections([section]);
-                        }
-                    }}
-                    sidebarOpen={sidebarOpen}
-                />
-                
-                {/* Main Content */}
-                <div className="admin-main">
-                    {/* Header */}
-                    <header className="admin-header">
-                        <div className="header-left">
-                            <button 
-                                className="menu-toggle"
-                                onClick={() => setSidebarOpen(!sidebarOpen)}
-                                aria-label="Toggle sidebar"
-                            >
-                                <MenuIcon />
-                            </button>
-                        </div>
-                        
-                        
-                        
-                        <div className="header-right">
-                            <button className="logout-button" onClick={handleLogout}>
-                                Logout
-                            </button>
-                        </div>
-                    </header>
-                    
-                    {/* Dashboard Content */}
-                    {(selectedSection === 'dashboard' || !['dashboard','users','enrollments','clc-list','clc-assign','clc-cai-list','clc-learner-list','clc-reports'].includes(selectedSection)) && (
-                        <div className="dashboard-content">
-                            {/* <div className="welcome-card">
-                                <h1 className="welcome-title">Welcome to Admin Dashboard</h1>
-                                <p className="welcome-subtitle">Manage your ALS Center operations from here.</p>
-                            </div> */}
+            <Head title="Admin Dashboard" />
+            <AdminLayout 
+                auth={auth} 
+                title="Admin Dashboard"
+                selectedSection={selectedSection}
+            >
+                {/* Dashboard Content */}
+                {(selectedSection === 'dashboard' || !['dashboard','users','enrollments','clc-list','clc-cai-list','clc-details','clc-reports','learner-list','attendance-list','modules','evaluation','reports'].includes(selectedSection)) && (
+                    <div className="dashboard-content">
+                        <div className="stats-grid">
+                            <div className="stat-card" style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '24px' 
+                            }}>
+                                <div>
+                                    <div className="stat-title" style={{ fontSize: '14px', fontWeight: '600', color: '#d1d5db', marginBottom: '8px' }}>
+                                        TOTAL USERS
+                                    </div>
+                                    <div className="stat-number" style={{ fontSize: '32px', fontWeight: 'bold', color: '#ffffff' }}>
+                                        {stats?.totalUsers || 18}
+                                    </div>
+                                    <div className="stat-subtitle" style={{ fontSize: '12px', color: '#9ca3af' }}>
+                                        System users
+                                    </div>
+                                </div>
+                                <PersonIcon sx={{ fontSize: 40, color: '#9ca3af' }} />
+                            </div>
                             
-                            <div className="stats-grid">
-                                <div className="stat-card">
-                                    <div className="stat-title">Total Users</div>
-                                    <div className="stat-number">{stats?.totalUsers || 0}</div>
-                                </div>
-                                
-                                <div className="stat-card">
-                                    <div className="stat-title">Enrollments</div>
-                                    <div className="stat-number">{stats?.enrollments || 0}</div>
-                                </div>
-                                
-                                <div className="stat-card">
-                                    <div className="stat-title">Active Modules</div>
-                                    <div className="stat-number">{stats?.activeModules || 0}</div>
-                                </div>
-                                
-                                <div className="stat-card">
-                                    <div className="stat-title">CLCs</div>
-                                    <div className="stat-number">{stats?.clcs || 0}</div>
-                                </div>
+                            <div className="stat-card">
+                                <div className="stat-title">ENROLLMENTS</div>
+                                <div className="stat-number">{stats?.enrollments || 22}</div>
+                                <div className="stat-subtitle">Pending applications</div>
+                            </div>
+                            
+                            <div className="stat-card">
+                                <div className="stat-title">ACTIVE MODULES</div>
+                                <div className="stat-number">{stats?.activeModules || 5}</div>
+                                <div className="stat-subtitle">Learning content</div>
+                            </div>
+                            
+                            <div className="stat-card">
+                                <div className="stat-title">CLCS</div>
+                                <div className="stat-number">{stats?.clcs || 0}</div>
+                                <div className="stat-subtitle">Learning centers</div>
                             </div>
                         </div>
-                    )}
+                    </div>
+                )}
 
-                    {/* Users Content */}
-                    {selectedSection === 'users' && (
-                        <UserContent 
-                            users={users}
-                            canCreate={!!getRoute('users.create')}
-                            routes={{
-                                create: getRoute('users.create') || undefined,
-                                show: (id) => getRoute('users.show', id),
-                                edit: (id) => getRoute('users.edit', id),
-                            }}
-                        />
-                    )}
+                {/* Users Content */}
+                {selectedSection === 'users' && (
+                    <UserContent 
+                        users={users}
+                        canCreate={!!getRoute('users.create')}
+                        routes={{
+                            create: getRoute('users.create') || undefined,
+                            show: (id) => getRoute('users.show', id),
+                            edit: (id) => getRoute('users.edit', id),
+                        }}
+                    />
+                )}
 
-                    {/* Enrollments Content */}
-                    {selectedSection === 'enrollments' && (
-                        <EnrollmentContent enrollments={enrollments} lists={lists} />
-                    )}
-                </div>
-            </div>
+                {/* Enrollments Content */}
+                {selectedSection === 'enrollments' && (
+                    <EnrollmentContent enrollments={enrollments} lists={lists} />
+                )}
+
+                {/* CLC Management Pages */}
+                {selectedSection === 'clc-list' && (
+                    <ClcList clcs={lists?.clcs || []} />
+                )}
+                
+                {selectedSection === 'clc-cai-list' && (
+                    <ClcCaiList cais={lists?.cais || []} clcs={lists?.clcs || []} />
+                )}
+                
+                {selectedSection === 'clc-details' && (
+                    <ClcDetails clcs={lists?.clcs || []} />
+                )}
+                
+                {selectedSection === 'clc-reports' && (
+                    <ClcReports clcs={lists?.clcs || []} />
+                )}
+
+                {/* Learning Content Pages */}
+                {selectedSection === 'learner-list' && (
+                    <LearnerList learners={lists?.learners || []} cais={lists?.cais || []} clcs={lists?.clcs || []} />
+                )}
+                
+                {selectedSection === 'attendance-list' && (
+                    <AttendanceList learners={lists?.learners || []} />
+                )}
+
+                {/* Placeholder sections for future implementation */}
+                {selectedSection === 'modules' && (
+                    <div className="dashboard-content">
+                        <h2>Modules Management</h2>
+                        <p>Module management functionality will be implemented here.</p>
+                    </div>
+                )}
+                
+                {selectedSection === 'evaluation' && (
+                    <div className="dashboard-content">
+                        <h2>Evaluation Management</h2>
+                        <p>Evaluation management functionality will be implemented here.</p>
+                    </div>
+                )}
+                
+                {selectedSection === 'reports' && (
+                    <div className="dashboard-content">
+                        <h2>Reports</h2>
+                        <p>Reports functionality will be implemented here.</p>
+                    </div>
+                )}
+            </AdminLayout>
         </>
     );
 }

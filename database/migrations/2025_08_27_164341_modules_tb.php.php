@@ -12,17 +12,13 @@ return new class extends Migration
   public function up(): void
     {
           Schema::create('modules_tb', function (Blueprint $table){
-            $table->id('modules_id');
+            $table->id('module_id');
             $table->foreignId('fk_cai_id');
-            $table->foreignId('fk_learner_id');
             $table->string('subject');
             $table->string('description');
             $table->timestamps();
 
-
-            // User to Learner
             $table->foreign('fk_cai_id')->references('cai_id')->on('cai_tb')->onDelete('cascade');
-            $table->foreign('fk_learner_id')->references('learner_id')->on('learner_tb')->onDelete('cascade');
         });
     }
 

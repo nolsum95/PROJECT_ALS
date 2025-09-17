@@ -39,7 +39,7 @@ class SubjectController extends Controller
 
         $subject = Subject::create($validated);
 
-        return redirect()->route('subjects.index')
+        return redirect()->route('cai.classwork')
             ->with('success', 'Subject created successfully.');
     }
 
@@ -63,40 +63,6 @@ class SubjectController extends Controller
         $subject = Subject::findOrFail($id);
         
         return Inertia::render('Subjects/Edit', [
-            'subject' => $subject
-        ]);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        $subject = Subject::findOrFail($id);
-        
-        $validated = $request->validate([
-            'subject_name' => 'required|string|max:50|unique:subject_tb,subject_name,' . $id . ',subject_id',
-        ]);
-
-        $subject->update($validated);
-
-        return redirect()->route('subjects.index')
-            ->with('success', 'Subject updated successfully.');
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        $subject = Subject::findOrFail($id);
-        $subject->delete();
-
-        return redirect()->route('subjects.index')
-            ->with('success', 'Subject deleted successfully.');
-    }
-}
-
             'subject' => $subject
         ]);
     }

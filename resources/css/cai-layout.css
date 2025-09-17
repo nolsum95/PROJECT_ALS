@@ -1,0 +1,85 @@
+/* CAI Layout Specific Styles */
+.cai-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+.cai-sidebar {
+  position: relative;
+}
+
+.cai-main-content {
+  flex-grow: 1;
+  background-color: #0f172a;
+  min-height: 100vh;
+}
+
+.cai-app-bar {
+  background-color: #182f54 !important;
+  color: #fff !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+.cai-page-content {
+  margin-top: 64px;
+  padding: 0;
+}
+
+/* CAI Sidebar Content */
+.cai-sidebar-header {
+  padding: 15px !important;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 64px;
+}
+
+.cai-sidebar-avatar {
+  width: 48px;
+  height: 48px;
+  background-color: #3b82f6;
+  font-size: 1.2rem;
+}
+
+.cai-sidebar-user-info {
+  margin-left: 16px;
+  overflow: hidden;
+}
+
+.cai-nav-item {
+  margin-bottom: 4px;
+}
+
+.cai-nav-button {
+  min-height: 40px;
+  padding: 0 20px;
+  border-radius: 6px;
+  color: #cbd5e1;
+}
+
+.cai-nav-button.active {
+  background-color: #3b82f6 !important;
+  color: #fff !important;
+}
+
+.cai-nav-button:hover {
+  background-color: rgba(255,255,255,0.1);
+}
+
+.cai-nav-button.active:hover {
+  background-color: #2563eb !important;
+}
+
+.cai-nav-icon {
+  min-width: 0;
+  margin-right: 24px;
+  justify-content: center;
+}
+
+.cai-nav-text {
+  font-weight: 400;
+}
+
+.cai-nav-text.active {
+  font-weight: 600;
+}

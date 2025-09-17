@@ -9,56 +9,21 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
-    {
-        Schema::table('user_tb', function (Blueprint $table) {
-            $table->string('name')->nullable()->first();
-        });
-    }
+   public function up(): void
+{
+    Schema::table('enrollment_alpha_tb', function (Blueprint $table) {
+        $table->string('learner_ref_no')->nullable()->after('enrollment_id');
+    });
+}
+
 
     /**
      * Reverse the migrations.
      */
     public function down(): void
     {
-        Schema::table('user_tb', function (Blueprint $table) {
-            $table->dropColumn('name');
+        Schema::table('enrollment_alpha_tb', function (Blueprint $table) {
+            //
         });
     }
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

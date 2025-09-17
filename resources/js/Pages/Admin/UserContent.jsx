@@ -1,10 +1,10 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+
 import Paper from '@mui/material/Paper';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
-// import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Toolbar from '@mui/material/Toolbar';
@@ -14,10 +14,11 @@ import Stack from '@mui/material/Stack';
 import MenuItem from '@mui/material/MenuItem';
 import CreateUserModal from './modals/CreateUserModal.jsx';
 import EditUserModal from './modals/EditUserModal.jsx';
-import '../../../css/adminTables.css';
 import IconButton from '@mui/material/IconButton';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import EditIcon from '@mui/icons-material/Edit';
+
+import '../../../css/adminTables.css';
 
 
 export default function UserContent({ users = {}, canCreate = true, title = 'User Management', routes = {} }) {
