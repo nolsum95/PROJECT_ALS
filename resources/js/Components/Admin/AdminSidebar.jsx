@@ -19,7 +19,13 @@ import {
   Toolbar,
   IconButton,
   Button,
-  useMediaQuery
+  useMediaQuery,
+  Menu,
+  MenuItem,
+  Paper,
+  ClickAwayListener,
+  Popper,
+  Fade
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -33,10 +39,16 @@ import {
   People as PeopleIcon,
   ManageAccounts as ManageAccountsIcon,
   EventAvailable as EventAvailableIcon,
+  CloudUpload as MaterialsIcon,
+  Quiz as ReviewersIcon,
+  School as ExamsIcon,
+  Schedule as ScheduleIcon,
   ExpandLess,
   ExpandMore,
   Menu as MenuIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  ArrowDropDown as ArrowDropDownIcon,
+  MoreHoriz as MoreHorizIcon
 } from '@mui/icons-material';
 import '../../../css/admin.css';
 
@@ -47,7 +59,7 @@ export default function AdminSidebar({
   user,
   selectedSection,
   onSelectSection,
-  expandedSections,
+  expandedSections = {},
   onToggleSection,
   children,
   title = 'Admin Dashboard'
@@ -55,6 +67,9 @@ export default function AdminSidebar({
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
+  const [internalExpandedSections, setInternalExpandedSections] = useState({});
+  const [assessmentMenuAnchor, setAssessmentMenuAnchor] = useState(null);
+  const assessmentMenuOpen = Boolean(assessmentMenuAnchor);
 
   const displayName = user?.name || (user?.email_address ? user.email_address.split('@')[0] : 'Admin');
 
@@ -67,6 +82,39 @@ export default function AdminSidebar({
     if (result.isConfirmed) {
       router.post(route('logout'));
     }
+  };
+
+  const handleToggleSection = (sectionId) => {
+    console.log('Toggling section:', sectionId);
+    if (onToggleSection) {
+      onToggleSection(sectionId);
+    } else {
+      setInternalExpandedSections(prev => ({
+        ...prev,
+        [sectionId]: !prev[sectionId]
+      }));
+    }
+  };
+
+  const isExpanded = (sectionId) => {
+    return expandedSections[sectionId] !== undefined 
+      ? expandedSections[sectionId] 
+      : internalExpandedSections[sectionId] || false;
+  };
+
+  const handleAssessmentMenuClick = (event) => {
+    setAssessmentMenuAnchor(event.currentTarget);
+  };
+
+  const handleAssessmentMenuClose = () => {
+    setAssessmentMenuAnchor(null);
+  };
+
+  const handleAssessmentSubmenuClick = (subItem) => {
+    if (onSelectSection) {
+      onSelectSection(subItem.id);
+    }
+    handleAssessmentMenuClose();
   };
 
   const handleDrawerToggle = () => {
@@ -116,11 +164,6 @@ export default function AdminSidebar({
           route: 'admin.dashboard',
           params: { section: 'clc-cai-list' }
         },
-      ]
-    },
-    {
-      title: 'LEARNING CONTENT',
-      items: [
         {
           id: 'learner-list',
           label: 'Learner List',
@@ -128,6 +171,11 @@ export default function AdminSidebar({
           route: 'admin.dashboard',
           params: { section: 'learner-list' }
         },
+      ]
+    },
+    {
+      title: 'LEARNING CONTENT',
+      items: [
         {
           id: 'attendance-list',
           label: 'Attendance',
@@ -136,18 +184,40 @@ export default function AdminSidebar({
           params: { section: 'attendance-list' }
         },
         {
-          id: 'modules',
-          label: 'Modules',
-          icon: <ArticleIcon />,
-          route: 'admin.dashboard',
-          params: { section: 'modules' }
-        },
-        {
-          id: 'evaluation',
-          label: 'Evaluation',
+          id: 'assessments',
+          label: 'Assessments',
           icon: <AssessmentIcon />,
-          route: 'admin.dashboard',
-          params: { section: 'evaluation' }
+          hasSubmenu: true,
+          submenu: [
+            {
+              id: 'materials',
+              label: 'Materials',
+              icon: <MaterialsIcon />,
+              route: 'admin.modules',
+              description: 'Upload and manage learning resources (PDFs, PPTs, docs, etc.)'
+            },
+            {
+              id: 'reviewers',
+              label: 'Reviewers',
+              icon: <ReviewersIcon />,
+              route: 'admin.reviewers',
+              description: 'Manage/upload reviewer sets learners can use for practice'
+            },
+            {
+              id: 'exams',
+              label: 'Exams',
+              icon: <ExamsIcon />,
+              route: 'admin.assessments',
+              description: 'Upload exam materials for CAIs to receive and download. Only Admin can upload, assigned CAIs can receive and download.'
+            },
+            {
+              id: 'schedules',
+              label: 'Schedules',
+              icon: <ScheduleIcon />,
+              route: 'admin.dashboard',
+              description: 'Manage upcoming exams, deadlines, announcements, meetings'
+            }
+          ]
         }
       ]
     },
@@ -211,6 +281,145 @@ export default function AdminSidebar({
             
             {/* Section Items */}
             {section.items.map((item) => {
+              // Handle Assessment item with floating dropdown
+              if (item.id === 'assessments' && item.hasSubmenu && item.submenu) {
+                const ItemComponent = (
+                  <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
+                    <ListItemButton
+                      onClick={handleAssessmentMenuClick}
+                      sx={{
+                        minHeight: 40,
+                        justifyContent: sidebarOpen ? 'initial' : 'center',
+                        px: 2.5,
+                        borderRadius: 1.5,
+                        color: assessmentMenuOpen ? '#fff' : '#cbd5e1',
+                        backgroundColor: assessmentMenuOpen ? '#3b82f6' : 'transparent',
+                        '&:hover': {
+                          backgroundColor: assessmentMenuOpen ? '#2563eb' : 'rgba(255,255,255,0.1)',
+                        }
+                      }}
+                    >
+                      <ListItemIcon
+                        sx={{
+                          minWidth: 0,
+                          mr: sidebarOpen ? 3 : 'auto',
+                          justifyContent: 'center',
+                          color: 'inherit',
+                        }}
+                      >
+                        {item.icon}
+                      </ListItemIcon>
+                      {sidebarOpen && (
+                        <>
+                          <ListItemText 
+                            primary={item.label}
+                            primaryTypographyProps={{ fontSize: '0.875rem' }}
+                          />
+                          <ArrowDropDownIcon />
+                        </>
+                      )}
+                    </ListItemButton>
+                  </ListItem>
+                );
+
+                return sidebarOpen ? ItemComponent : (
+                  <Tooltip key={item.id} title={item.label} placement="right">
+                    {ItemComponent}
+                  </Tooltip>
+                );
+              }
+
+              // Handle other items with submenus (if any)
+              if (item.hasSubmenu && item.submenu) {
+                const itemIsExpanded = isExpanded(item.id);
+                
+                return (
+                  <Box key={item.id}>
+                    {/* Main menu item with dropdown */}
+                    <ListItem disablePadding sx={{ mb: 0.5 }}>
+                      <ListItemButton
+                        onClick={() => handleToggleSection(item.id)}
+                        sx={{
+                          minHeight: 40,
+                          justifyContent: sidebarOpen ? 'initial' : 'center',
+                          px: 2.5,
+                          borderRadius: 1.5,
+                          color: selectedSection === item.id ? '#fff' : '#cbd5e1',
+                          backgroundColor: selectedSection === item.id ? '#3b82f6' : 'transparent',
+                          '&:hover': {
+                            backgroundColor: selectedSection === item.id ? '#2563eb' : 'rgba(255,255,255,0.1)',
+                          }
+                        }}
+                      >
+                        <ListItemIcon
+                          sx={{
+                            minWidth: 0,
+                            mr: sidebarOpen ? 3 : 'auto',
+                            justifyContent: 'center',
+                            color: 'inherit',
+                          }}
+                        >
+                          {item.icon}
+                        </ListItemIcon>
+                        {sidebarOpen && (
+                          <>
+                            <ListItemText 
+                              primary={item.label}
+                              primaryTypographyProps={{ fontSize: '0.875rem' }}
+                            />
+                            {itemIsExpanded ? <ExpandLess /> : <ExpandMore />}
+                          </>
+                        )}
+                      </ListItemButton>
+                    </ListItem>
+
+                    {/* Submenu items */}
+                    {sidebarOpen && (
+                      <Collapse in={itemIsExpanded} timeout="auto" unmountOnExit>
+                        <List component="div" disablePadding>
+                          {item.submenu.map((subItem) => (
+                            <ListItem key={subItem.id} disablePadding sx={{ mb: 0.3 }}>
+                              <ListItemButton
+                                component={Link}
+                                href={route(subItem.route)}
+                                onClick={() => onSelectSection && onSelectSection(subItem.id)}
+                                sx={{
+                                  minHeight: 36,
+                                  pl: 6,
+                                  pr: 2.5,
+                                  borderRadius: 1,
+                                  color: selectedSection === subItem.id ? '#fff' : '#94a3b8',
+                                  backgroundColor: selectedSection === subItem.id ? '#2563eb' : 'transparent',
+                                  '&:hover': {
+                                    backgroundColor: selectedSection === subItem.id ? '#1d4ed8' : 'rgba(255,255,255,0.05)',
+                                  }
+                                }}
+                              >
+                                <ListItemIcon
+                                  sx={{
+                                    minWidth: 0,
+                                    mr: 2,
+                                    justifyContent: 'center',
+                                    color: 'inherit',
+                                  }}
+                                >
+                                  {subItem.icon}
+                                </ListItemIcon>
+                                <ListItemText 
+                                  primary={subItem.label}
+                                  primaryTypographyProps={{ fontSize: '0.8rem' }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          ))}
+                        </List>
+                      </Collapse>
+                    )}
+                  </Box>
+                );
+              }
+
+              // Handle regular menu items
               const ItemComponent = (
                 <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
                   <ListItemButton
@@ -373,6 +582,57 @@ export default function AdminSidebar({
           {children}
         </div>
       </div>
+
+      {/* Floating Assessment Menu */}
+      <Menu
+        anchorEl={assessmentMenuAnchor}
+        open={assessmentMenuOpen}
+        onClose={handleAssessmentMenuClose}
+        PaperProps={{
+          sx: {
+            backgroundColor: '#1e293b',
+            color: '#cbd5e1',
+            border: '1px solid #334155',
+            minWidth: 200,
+            '& .MuiMenuItem-root': {
+              fontSize: '0.875rem',
+              py: 1.5,
+              px: 2,
+              '&:hover': {
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              }
+            }
+          }
+        }}
+        transformOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        anchorOrigin={{
+          vertical: 'center',
+          horizontal: 'right',
+        }}
+      >
+        {menuSections.find(section => section.title === 'LEARNING CONTENT')?.items
+          .find(item => item.id === 'assessments')?.submenu?.map((subItem) => (
+          <MenuItem 
+            key={subItem.id}
+            onClick={() => handleAssessmentSubmenuClick(subItem)}
+            component={Link}
+            href={route(subItem.route)}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5
+            }}
+          >
+            <Box sx={{ color: 'inherit', display: 'flex' }}>
+              {subItem.icon}
+            </Box>
+            {subItem.label}
+          </MenuItem>
+        ))}
+      </Menu>
     </div>
   );
 }

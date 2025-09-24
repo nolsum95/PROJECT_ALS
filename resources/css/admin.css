@@ -28,6 +28,8 @@
 
 .admin-page-content {
   margin-top: 64px;
+  margin-left: 50px;
+  margin-right: 50px;
   padding: 0;
 }
 
@@ -38,8 +40,7 @@
   align-items: center;
   justify-content: flex-start;
   min-height: 64px;
-  background-color: #182f54;
-  border-bottom: 1px solid #334155;
+
 }
 
 .admin-sidebar-avatar {

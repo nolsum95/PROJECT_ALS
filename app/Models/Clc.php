@@ -23,4 +23,14 @@ class Clc extends Model
     {
         return $this->hasMany(Learner::class, 'assigned_clc', 'clc_id');
     }
+
+    public function classworks()
+    {
+        return $this->hasMany(Classwork::class, 'fk_clc_id', 'clc_id');
+    }
+
+    public function cai()
+    {
+        return $this->hasOne(Cai::class, 'assigned_clc', 'clc_id');
+    }
 }

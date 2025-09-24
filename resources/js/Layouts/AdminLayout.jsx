@@ -8,14 +8,15 @@ export default function AdminLayout({
   selectedSection = 'dashboard',
   onSelectSection = () => {}
 }) {
-  const [expandedSections, setExpandedSections] = useState(['clc', 'learning']);
+  const [expandedSections, setExpandedSections] = useState({
+    assessments: false // Start with assessments collapsed
+  });
 
   const handleToggleSection = (sectionId) => {
-    setExpandedSections(prev => 
-      prev.includes(sectionId) 
-        ? prev.filter(id => id !== sectionId)
-        : [...prev, sectionId]
-    );
+    setExpandedSections(prev => ({
+      ...prev,
+      [sectionId]: !prev[sectionId]
+    }));
   };
 
   return (

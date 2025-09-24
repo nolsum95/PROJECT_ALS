@@ -70,6 +70,11 @@ class User extends Authenticatable
         return $this->email_address;
     }
 
+    public function cai()
+    {
+        return $this->hasOne(Cai::class, 'fk_userId', 'user_id');
+    }
+
     public function cais()
     {
         return $this->hasMany(Cai::class, 'fk_userId', 'user_id');

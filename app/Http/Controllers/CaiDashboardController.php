@@ -10,9 +10,14 @@ use App\Models\Learner;
 use App\Models\Modules;
 use App\Models\Classwork;
 use App\Models\Attendance;
+use App\Models\Questionnaire;
+use App\Models\Question;
+use App\Models\Subject;
+use App\Models\FileStorage;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Models\LearnerAttempt;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
@@ -57,7 +62,6 @@ class CaiDashboardController extends Controller
         // Count modules created by this CAI
         $modulesCreated = Modules::where('fk_cai_id', $cai->cai_id)->count();
 
-
         // Today's attendance (use CLC learners for broader scope)
         $attendanceToday = Attendance::whereIn('learner_id', $clcLearnerIds)
             ->whereDate('attendance_date', Carbon::today())
@@ -92,6 +96,122 @@ class CaiDashboardController extends Controller
             'recentLearners' => $recentLearners,
             'recentModules' => $recentModules
         ]);
+    }
+
+    /**
+     * Display CAI Exams creation page (Pretest/Posttest only)
+     */
+    public function exams(Request $request)
+    {
+        $user = Auth::user();
+        $cai = Cai::where('fk_userId', $user->user_id)->first();
+
+        if (!$cai) {
+            return redirect()->route('dashboard');
+        }
+
+        $classworks = Classwork::where('fk_cai_id', $cai->cai_id)
+            ->whereIn('test_level', ['pretest', 'posttest'])
+            ->with(['questionnaires.questions', 'questionnaires.subject'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        $subjects = \App\Models\Subject::all();
+
+        return Inertia::render('CAI/Exams', [
+            'auth' => ['user' => $user],
+            'cai' => $cai,
+            'classworks' => $classworks,
+            'subjects' => $subjects,
+        ]);
+    }
+
+    /**
+     * Save CAI-created Exam (Pretest/Posttest)
+     */
+    public function storeExam(Request $request)
+    {
+        $user = Auth::user();
+        $cai = Cai::where('fk_userId', $user->user_id)->first();
+
+        if (!$cai) {
+            return redirect()->route('dashboard');
+        }
+
+        $request->validate([
+            'test_level' => 'required|in:pretest,posttest',
+            'questionnaire.subject_id' => 'nullable|exists:subject_tb,subject_id',
+            'questionnaire.title' => 'nullable|string|max:255',
+            'questionnaire.description' => 'nullable|string',
+            'questionnaire.time_duration' => 'nullable|integer|min:1|max:300',
+        ]);
+
+        $classwork = Classwork::create([
+            'fk_cai_id' => $cai->cai_id,
+            'test_level' => $request->test_level,
+        ]);
+
+        if ($request->has('questionnaire') && ($request->questionnaire['subject_id'] ?? null) && ($request->questionnaire['title'] ?? null)) {
+            \App\Models\Questionnaire::create([
+                'fk_classwork_id' => $classwork->classwork_id,
+                'fk_subject_id' => $request->questionnaire['subject_id'],
+                'title' => $request->questionnaire['title'],
+                'description' => $request->questionnaire['description'] ?? '',
+                'time_duration' => $request->questionnaire['time_duration'] ?? 30,
+            ]);
+        }
+
+        return redirect()->route('cai.exams')->with('success', 'Exam created successfully!');
+    }
+
+    /**
+     * Store questions for CAI-created Exam
+     */
+    public function storeExamQuestions(Request $request)
+    {
+        $user = Auth::user();
+        $cai = Cai::where('fk_userId', $user->user_id)->first();
+
+        if (!$cai) {
+            return redirect()->route('dashboard');
+        }
+
+        $request->validate([
+            'questionnaire_id' => 'required|exists:questionnaire_tb,qn_id',
+            'questions' => 'required|array|min:1',
+            'questions.*.question_text' => 'required|string',
+            'questions.*.option_a' => 'required|string',
+            'questions.*.option_b' => 'required|string',
+            'questions.*.option_c' => 'required|string',
+            'questions.*.option_d' => 'required|string',
+            'questions.*.ans_key' => 'required|in:A,B,C,D',
+        ]);
+
+        // Verify questionnaire belongs to a classwork owned by this CAI
+        $questionnaire = \App\Models\Questionnaire::where('qn_id', $request->questionnaire_id)
+            ->whereHas('classwork', function($query) use ($cai) {
+                $query->where('fk_cai_id', $cai->cai_id);
+            })
+            ->first();
+
+        if (!$questionnaire) {
+            return back()->with('error', 'Unauthorized access to questionnaire.');
+        }
+
+        // Create questions
+        foreach ($request->questions as $questionData) {
+            \App\Models\Question::create([
+                'fk_qn_id' => $request->questionnaire_id,
+                'question_text' => $questionData['question_text'],
+                'option_a' => $questionData['option_a'],
+                'option_b' => $questionData['option_b'],
+                'option_c' => $questionData['option_c'],
+                'option_d' => $questionData['option_d'],
+                'ans_key' => $questionData['ans_key'],
+            ]);
+        }
+
+        return redirect()->route('cai.exams')->with('success', 'Questions added successfully!');
     }
 
     /**
@@ -369,7 +489,7 @@ class CaiDashboardController extends Controller
     }
 
     /**
-     * Display modules management
+     * Display modules assigned to CAI's CLC
      */
     public function modules(Request $request)
     {
@@ -380,43 +500,75 @@ class CaiDashboardController extends Controller
             return redirect()->route('dashboard');
         }
 
-        $assignedLearners = Learner::where('assigned_cai', $cai->cai_id)->get();
-        $learnerIds = $assignedLearners->pluck('learner_id');
+        // Get modules assigned to this CAI's CLC
+        try {
+            // Try new schema first (after migration)
+            $modules = Modules::with(['clc', 'createdByAdmin'])
+                ->where('fk_clc_id', $cai->assigned_clc)
+                ->where('status', 'active')
+                ->whereNotNull('created_by_admin') // Only admin-created modules
+                ->orderByDesc('assigned_at')
+                ->get();
+        } catch (\Exception $e) {
+            // Fallback to old schema (before migration)
+            $modules = Modules::where('fk_cai_id', $cai->cai_id)
+                ->orderByDesc('created_at')
+                ->get();
+        }
 
-        // Get modules created by this CAI - removed progress tracking
-        $modules = Modules::where('fk_cai_id', $cai->cai_id)->get()->map(function ($module) {
-            // Removed module assignment tracking
-            $completedCount = 0;
-            $inProgressCount = 0;
-            $totalAssigned = 0;
-
-            $module->completedCount = $completedCount;
-            $module->inProgressCount = $inProgressCount;
-            $module->totalLearners = $totalAssigned;
-
-            return $module;
-        });
-
-        // Add module progress data to learners - removed module tracking
-        $assignedLearners = $assignedLearners->map(function ($learner) {
-            $assignedModules = 0;
-            $completedModules = 0;
-            $inProgressModules = 0;
-
-            $learner->assignedModules = $assignedModules;
-            $learner->completedModules = $completedModules;
-            $learner->inProgressModules = $inProgressModules;
-
-            return $learner;
-        });
+        // Get reviewer materials uploaded by admin for this CLC (from file storage)
+        $reviewerMaterials = FileStorage::with(['clc', 'uploadedBy'])
+            ->where(function($query) use ($cai) {
+                $query->where('fk_clc_id', $cai->assigned_clc)
+                      ->orWhereNull('fk_clc_id'); // Global materials
+            })
+            ->whereJsonContains('metadata->material_type', 'reviewer')
+            ->orderByDesc('created_at')
+            ->get();
 
         return Inertia::render('CAI/Modules', [
             'auth' => ['user' => $user],
             'cai' => $cai,
             'modules' => $modules,
-            'assignedLearners' => $assignedLearners,
-            'view' => $request->get('view', 'list')
+            'reviewerMaterials' => $reviewerMaterials,
         ]);
+    }
+
+    /**
+     * Download a module file
+     */
+    public function downloadModule($moduleId)
+    {
+        $user = Auth::user();
+        $cai = Cai::where('fk_userId', $user->user_id)->first();
+        
+        if (!$cai) {
+            return back()->with('error', 'CAI profile not found.');
+        }
+
+        // Verify module access
+        try {
+            // Try new schema first (after migration)
+            $module = Modules::where('module_id', $moduleId)
+                ->where('fk_clc_id', $cai->assigned_clc)
+                ->where('status', 'active')
+                ->first();
+        } catch (\Exception $e) {
+            // Fallback to old schema (before migration)
+            $module = Modules::where('module_id', $moduleId)
+                ->where('fk_cai_id', $cai->cai_id)
+                ->first();
+        }
+
+        if (!$module) {
+            return back()->with('error', 'Module not found or not accessible.');
+        }
+
+        if (!$module->file_path || !Storage::disk('public')->exists($module->file_path)) {
+            return back()->with('error', 'Module file not found.');
+        }
+
+        return Storage::disk('public')->download($module->file_path, $module->file_name);
     }
 
     /**
@@ -773,6 +925,8 @@ class CaiDashboardController extends Controller
 
         $request->validate([
             'test_level' => 'required|in:reviewer,pretest,posttest',
+            'test_title' => 'required|string|max:255',
+            'test_description' => 'nullable|string',
             // Validate questionnaire fields if provided
             'questionnaire.subject_id' => 'nullable|exists:subject_tb,subject_id',
             'questionnaire.title' => 'nullable|string|max:255',
@@ -783,7 +937,10 @@ class CaiDashboardController extends Controller
         // Create the classwork
         $classwork = Classwork::create([
             'fk_cai_id' => $cai->cai_id,
+            'fk_clc_id' => $cai->assigned_clc,
             'test_level' => $request->test_level,
+            'test_title' => $request->test_title,
+            'test_description' => $request->test_description,
         ]);
 
         // If questionnaire data is provided, create the questionnaire
@@ -797,7 +954,7 @@ class CaiDashboardController extends Controller
             ]);
         }
 
-        return redirect()->route('cai.classwork')->with('success', 'Classwork created successfully!');
+        return redirect()->route('cai.reviewers')->with('success', 'Reviewer classwork created successfully!');
     }
 
     /**
@@ -887,5 +1044,241 @@ class CaiDashboardController extends Controller
         }
 
         return redirect()->route('cai.classwork')->with('success', 'Questions added successfully!');
+    }
+
+    /**
+     * Display reviewer monitoring for CAI
+     */
+    public function reviewers()
+    {
+        $cai = auth()->user()->cai;
+        
+        if (!$cai) {
+            return Inertia::render('CAI/ReviewerMonitoring', [
+                'reviewers' => [],
+                'stats' => [
+                    'total_reviewers' => 0,
+                    'total_pretests' => 0,
+                    'total_posttests' => 0,
+                    'total_questions' => 0,
+                    'clc_name' => 'No CLC Assigned'
+                ],
+                'subjects' => []
+            ]);
+        }
+        
+        $clcId = $cai->assigned_clc;
+
+        // Get both admin-created materials AND CAI-created reviewers for this CLC
+        $reviewers = Classwork::with(['questionnaires.questions', 'questionnaires.subject', 'clc', 'fileStorage'])
+            ->where(function($query) use ($cai, $clcId) {
+                // Admin-created tests for this CLC
+                $query->where(function($q) use ($clcId) {
+                    $q->whereNull('fk_cai_id')
+                      ->where(function($subQ) use ($clcId) {
+                          $subQ->where('fk_clc_id', $clcId)
+                               ->orWhereNull('fk_clc_id');
+                      })
+                      ->whereIn('posting_status', ['posted', 'draft']);
+                })
+                // OR CAI-created reviewers by this CAI
+                ->orWhere(function($q) use ($cai) {
+                    $q->where('fk_cai_id', $cai->cai_id)
+                      ->where('test_level', 'reviewer');
+                });
+            })
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $stats = [
+            'total_reviewers' => $reviewers->where('test_level', 'reviewer')->count(),
+            'total_pretests' => $reviewers->where('test_level', 'pretest')->count(),
+            'total_posttests' => $reviewers->where('test_level', 'posttest')->count(),
+            'total_questions' => $reviewers->sum(function($reviewer) {
+                return $reviewer->questionnaires->sum(function($questionnaire) {
+                    return $questionnaire->questions->count();
+                });
+            }),
+            'clc_name' => $cai->clc->clc_name ?? 'Unknown CLC'
+        ];
+
+        // Get available subjects for questionnaire creation
+        $subjects = Subject::all();
+
+        return Inertia::render('CAI/ReviewerMonitoring', [
+            'reviewers' => $reviewers,
+            'stats' => $stats,
+            'subjects' => $subjects
+        ]);
+    }
+
+    /**
+     * Create a questionnaire for an admin-created test
+     */
+    public function storeReviewerQuestionnaire(Request $request)
+    {
+        $validated = $request->validate([
+            'classwork_id' => 'required|exists:classwork_tb,classwork_id',
+            'subject_id' => 'required|exists:subject_tb,subject_id',
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'time_duration' => 'required|integer|min:1|max:300'
+        ]);
+
+        // Verify the classwork belongs to admin and is for this CAI's CLC
+        $cai = auth()->user()->cai;
+        
+        if (!$cai) {
+            return redirect()->route('cai.reviewers')->withErrors(['error' => 'CAI record not found']);
+        }
+        
+        $classwork = Classwork::where('classwork_id', $validated['classwork_id'])
+            ->where(function($query) use ($cai) {
+                // Allow both admin-created and CAI-created classworks
+                $query->where(function($q) use ($cai) {
+                    // Admin-created for this CLC
+                    $q->whereNull('fk_cai_id')
+                      ->where(function($subQ) use ($cai) {
+                          $subQ->where('fk_clc_id', $cai->assigned_clc)
+                               ->orWhereNull('fk_clc_id');
+                      });
+                })->orWhere(function($q) use ($cai) {
+                    // CAI-created by this CAI
+                    $q->where('fk_cai_id', $cai->cai_id);
+                });
+            })
+            ->firstOrFail();
+
+        $questionnaire = Questionnaire::create([
+            'fk_classwork_id' => $validated['classwork_id'],
+            'fk_subject_id' => $validated['subject_id'],
+            'title' => $validated['title'],
+            'description' => $validated['description'],
+            'time_duration' => $validated['time_duration']
+        ]);
+
+        return redirect()->route('cai.reviewers')->with('success', 'Questionnaire created successfully!');
+    }
+
+    /**
+     * Add questions to a questionnaire
+     */
+    public function storeReviewerQuestions(Request $request)
+    {
+        $validated = $request->validate([
+            'questionnaire_id' => 'required|exists:questionnaire_tb,qn_id',
+            'questions' => 'required|array|min:1',
+            'questions.*.question_text' => 'required|string',
+            'questions.*.option_a' => 'required|string',
+            'questions.*.option_b' => 'required|string',
+            'questions.*.option_c' => 'required|string',
+            'questions.*.option_d' => 'required|string',
+            'questions.*.ans_key' => 'required|in:A,B,C,D'
+        ]);
+
+        // Verify the questionnaire belongs to a test accessible by this CAI
+        $cai = auth()->user()->cai;
+        
+        if (!$cai) {
+            return redirect()->route('cai.reviewers')->withErrors(['error' => 'CAI record not found']);
+        }
+        
+        $questionnaire = Questionnaire::with('classwork')
+            ->where('qn_id', $validated['questionnaire_id'])
+            ->whereHas('classwork', function($query) use ($cai) {
+                // Allow both admin-created and CAI-created classworks
+                $query->where(function($q) use ($cai) {
+                    // Admin-created for this CLC
+                    $q->whereNull('fk_cai_id')
+                      ->where(function($subQ) use ($cai) {
+                          $subQ->where('fk_clc_id', $cai->assigned_clc)
+                               ->orWhereNull('fk_clc_id');
+                      });
+                })->orWhere(function($q) use ($cai) {
+                    // CAI-created by this CAI
+                    $q->where('fk_cai_id', $cai->cai_id);
+                });
+            })
+            ->firstOrFail();
+
+        $createdQuestions = [];
+        foreach ($validated['questions'] as $questionData) {
+            $question = Question::create([
+                'fk_qn_id' => $validated['questionnaire_id'],
+                'question_text' => $questionData['question_text'],
+                'option_a' => $questionData['option_a'],
+                'option_b' => $questionData['option_b'],
+                'option_c' => $questionData['option_c'],
+                'option_d' => $questionData['option_d'],
+                'ans_key' => $questionData['ans_key']
+            ]);
+            $createdQuestions[] = $question;
+        }
+
+        return redirect()->route('cai.reviewers')->with('success', count($createdQuestions) . ' questions added successfully!');
+    }
+
+    /**
+     * Download admin-uploaded file
+     */
+    public function downloadFile($classworkId)
+    {
+        $cai = auth()->user()->cai;
+        
+        if (!$cai) {
+            abort(404, 'CAI record not found');
+        }
+        
+        // Verify the classwork belongs to admin and is for this CAI's CLC
+        $classwork = Classwork::with('fileStorage')
+            ->where('classwork_id', $classworkId)
+            ->whereNull('fk_cai_id') // Admin-created only
+            ->where(function($query) use ($cai) {
+                $query->where('fk_clc_id', $cai->assigned_clc)
+                      ->orWhereNull('fk_clc_id');
+            })
+            ->firstOrFail();
+
+        if (!$classwork->fileStorage) {
+            abort(404, 'File not found');
+        }
+
+        $fileStorage = $classwork->fileStorage;
+        $filePath = storage_path('app/' . $fileStorage->storage_disk . '/' . $fileStorage->file_path);
+
+        if (!file_exists($filePath)) {
+            abort(404, 'File not found on disk');
+        }
+
+        return response()->download($filePath, $fileStorage->original_name);
+    }
+
+    /**
+     * Download file by FileStorage ID (for reviewer materials)
+     */
+    public function downloadFileStorage($fileId)
+    {
+        $cai = auth()->user()->cai;
+        
+        if (!$cai) {
+            abort(404, 'CAI record not found');
+        }
+        
+        // Direct FileStorage download for reviewer materials
+        $fileStorage = FileStorage::with('clc')
+            ->where('id', $fileId)
+            ->where(function($query) use ($cai) {
+                $query->where('fk_clc_id', $cai->assigned_clc)
+                      ->orWhereNull('fk_clc_id'); // Global materials
+            })
+            ->firstOrFail();
+
+        $filePath = storage_path('app/' . $fileStorage->storage_disk . '/' . $fileStorage->file_path);
+
+        if (!file_exists($filePath)) {
+            abort(404, 'File not found on disk');
+        }
+
+        return response()->download($filePath, $fileStorage->original_name);
     }
 }

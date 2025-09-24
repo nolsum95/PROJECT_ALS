@@ -53,4 +53,16 @@ class Cai extends Model
     {
         return $this->hasMany(Classwork::class, 'fk_cai_id', 'cai_id');
     }
+
+    public function questionnaires()
+    {
+        return $this->hasManyThrough(
+            Questionnaire::class,
+            Classwork::class,
+            'fk_cai_id', // Foreign key on classwork table
+            'fk_classwork_id', // Foreign key on questionnaire table
+            'cai_id', // Local key on cai table
+            'classwork_id' // Local key on classwork table
+        );
+    }
 }

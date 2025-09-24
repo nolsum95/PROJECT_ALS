@@ -48,7 +48,8 @@ export default function CaiSidebar({
     { id: 'learners', label: 'Learners', icon: <GroupIcon />, route: 'cai.learners' },
     { id: 'attendance', label: 'Attendance', icon: <EventAvailableIcon />, route: 'cai.attendance' },
     { id: 'modules', label: 'Modules', icon: <MenuBookIcon />, route: 'cai.modules' },
-    { id: 'classwork', label: 'Classwork', icon: <QuizIcon />, route: 'cai.classwork' },
+    { id: 'exams', label: 'Exams', icon: <ArchiveIcon />, route: 'cai.exams' },
+    { id: 'reviewers', label: 'Reviewer Monitoring', icon: <QuizIcon />, route: 'cai.reviewers' },
     { id: 'reports', label: 'Reports', icon: <SummarizeIcon />, route: 'cai.reports' },
   ];
 
