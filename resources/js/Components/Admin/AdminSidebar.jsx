@@ -71,7 +71,8 @@ export default function AdminSidebar({
   const [assessmentMenuAnchor, setAssessmentMenuAnchor] = useState(null);
   const assessmentMenuOpen = Boolean(assessmentMenuAnchor);
 
-  const displayName = user?.name || (user?.email_address ? user.email_address.split('@')[0] : 'Admin');
+  const displayName = user?.name || 'Admin';
+  const displayEmail = user?.email_address || 'admin@example.com';
 
   useEffect(() => {
     setSidebarOpen(!isMobile);
@@ -248,13 +249,13 @@ export default function AdminSidebar({
               {displayName}
             </Typography>
             <Typography variant="body2" sx={{ color: '#cbd5e1' }}>
-              System Administrator
+              {displayEmail}
             </Typography>
           </Box>
         )}
       </Box>
 
-      <Divider sx={{ borderColor: '#334155' }} />
+      <Divider />
 
       {/* Navigation Menu */}
       <List sx={{ px: 1.7, py: 1 }}>

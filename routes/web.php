@@ -22,6 +22,12 @@ Route::get('/enroll', function () {
     return Inertia::render('Guest/EnrollmentPage');
 })->name('enrollment.page');
 Route::post('/enroll', [\App\Http\Controllers\EnrollmentGuestController::class, 'store'])->name('enrollment.store');
+Route::get('/enrollment/receipt', function () {
+    $enrollmentData = json_decode(request('enrollmentData'), true);
+    return Inertia::render('Guest/ReceiptPage', [
+        'enrollmentData' => $enrollmentData
+    ]);
+})->name('enrollment.receipt');
 
 // Redirect old dashboard route to admin dashboard
 Route::get('/dashboard', function () {
@@ -34,7 +40,8 @@ Route::get('/dashboard', function () {
             return redirect()->route('admin.dashboard');
         case 'Cai':
             return redirect()->route('cai.dashboard');
-        // Add more roles as needed
+        case 'Learner':
+            return redirect()->route('learner.dashboard');
         default:
             return redirect('/'); // or a generic dashboard
     }
@@ -177,6 +184,27 @@ Route::middleware(['auth', 'verified', 'role:Cai'])->prefix('cai')->name('cai.')
     Route::post('/enrollments/{enrollmentId}/status', [CaiDashboardController::class, 'updateEnrollmentStatus'])->name('enrollments.updateStatus');
     Route::get('/enrollments/{enrollmentId}/status', [CaiDashboardController::class, 'getEnrollmentStatus'])->name('enrollments.getStatus');
     Route::get('/reports', [\App\Http\Controllers\CaiDashboardController::class, 'reports'])->name('reports');
+});
+
+// Learner routes
+Route::middleware(['auth', 'verified', 'role:Learner'])->prefix('learner')->name('learner.')->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\LearnerDashboardController::class, 'dashboard'])->name('dashboard');
+    Route::get('/profile', [\App\Http\Controllers\LearnerDashboardController::class, 'profile'])->name('profile');
+    Route::put('/profile', [\App\Http\Controllers\LearnerDashboardController::class, 'updateProfile'])->name('profile.update');
+    Route::put('/password', [\App\Http\Controllers\LearnerDashboardController::class, 'updatePassword'])->name('password.update');
+    
+    Route::get('/enrollment', [\App\Http\Controllers\LearnerDashboardController::class, 'enrollmentStatus'])->name('enrollment');
+    
+    Route::get('/reviewers', [\App\Http\Controllers\LearnerDashboardController::class, 'studyMaterials'])->name('reviewers');
+    Route::get('/reviewers/{reviewerId}/take', [\App\Http\Controllers\LearnerDashboardController::class, 'takeReviewer'])->name('reviewers.take');
+    Route::get('/modules/{moduleId}/download', [\App\Http\Controllers\LearnerDashboardController::class, 'downloadModule'])->name('modules.download');
+    
+    Route::get('/exams', [\App\Http\Controllers\LearnerDashboardController::class, 'exams'])->name('exams');
+    
+    Route::get('/progress', [\App\Http\Controllers\LearnerDashboardController::class, 'progress'])->name('progress');
+    
+    Route::get('/reports', [\App\Http\Controllers\LearnerDashboardController::class, 'reports'])->name('reports');
+    Route::post('/reports/request', [\App\Http\Controllers\LearnerDashboardController::class, 'requestReport'])->name('reports.request');
 });
 
 require __DIR__.'/auth.php';

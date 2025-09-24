@@ -16,8 +16,27 @@ class LearnerAttempt extends Model
     protected $fillable = [
         'fk_learner_id',
         'fk_qn_id',
+        'assessment_id',
         'attempt_no',
         'attempt_date',
+        'status',
+        'score',
+        'time_taken',
+        'started_at',
+        'completed_at',
+        'answers',
+        'is_passed',
+        'passing_score',
+    ];
+
+    protected $casts = [
+        'answers' => 'array',
+        'score' => 'decimal:2',
+        'passing_score' => 'decimal:2',
+        'is_passed' => 'boolean',
+        'started_at' => 'datetime',
+        'completed_at' => 'datetime',
+        'attempt_date' => 'date',
     ];
 
     public function learner()
@@ -28,6 +47,11 @@ class LearnerAttempt extends Model
     public function questionnaire()
     {
         return $this->belongsTo(Questionnaire::class, 'fk_qn_id', 'qn_id');
+    }
+
+    public function assessment()
+    {
+        return $this->belongsTo(Assessment::class, 'assessment_id', 'assessment_id');
     }
 
     // Get classwork through questionnaire

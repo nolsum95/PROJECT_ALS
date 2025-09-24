@@ -301,7 +301,7 @@ export default function CreateQuestionsModal({ open, onClose, exam }) {
       
       <DialogContent sx={{ p: 3 }}>
         {exam && (
-          <Box sx={{ mb: 3, p: 2, bgcolor: 'primary.50', borderRadius: 1 }}>
+          <Box sx={{ mb: 1, p: 2, bgcolor: 'primary.50', borderRadius: 1 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
               {exam.questionnaires?.[0]?.title || 'Untitled Exam'}
             </Typography>

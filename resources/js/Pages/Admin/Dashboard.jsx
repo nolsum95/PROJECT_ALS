@@ -105,7 +105,7 @@ export default function AdminDashboard({ auth, stats, flash, users = [], enrollm
         <>
             <Head title="Admin Dashboard" />
             <AdminLayout 
-                auth={auth} 
+                user={auth?.user} 
                 title="Admin Dashboard"
                 selectedSection={selectedSection}
             >
