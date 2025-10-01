@@ -61,102 +61,24 @@ export default function Exams({
   const [selectedExam, setSelectedExam] = useState(null);
   const [showExamDialog, setShowExamDialog] = useState(false);
 
-  // Mock data for demonstration
-  const mockAvailableExams = availableExams.length > 0 ? availableExams : [
-    {
-      id: 1,
-      title: 'Mathematics Pretest',
-      subject: 'Mathematics',
-      type: 'pretest',
-      description: 'Assessment of basic mathematical skills',
-      questions_count: 40,
-      time_duration: 90,
-      passing_score: 75,
-      available_from: '2025-01-15T08:00:00',
-      available_until: '2025-01-15T17:00:00',
-      status: 'available',
-      attempts_allowed: 1,
-      current_attempts: 0
-    },
-    {
-      id: 2,
-      title: 'English Communication Test',
-      subject: 'English',
-      type: 'posttest',
-      description: 'Comprehensive English language assessment',
-      questions_count: 35,
-      time_duration: 75,
-      passing_score: 80,
-      available_from: '2025-01-20T08:00:00',
-      available_until: '2025-01-20T17:00:00',
-      status: 'upcoming',
-      attempts_allowed: 1,
-      current_attempts: 0
-    },
-    {
-      id: 3,
-      title: 'Science Knowledge Test',
-      subject: 'Science',
-      type: 'quiz',
-      description: 'Basic science concepts and principles',
-      questions_count: 25,
-      time_duration: 60,
-      passing_score: 70,
-      available_from: '2025-01-10T08:00:00',
-      available_until: '2025-01-10T17:00:00',
-      status: 'completed',
-      attempts_allowed: 2,
-      current_attempts: 1
-    }
-  ];
+  // Use server-provided availableExams; fallback to []
+  const mockAvailableExams = Array.isArray(availableExams) ? availableExams : [];
 
-  const mockExamHistory = examHistory.length > 0 ? examHistory : [
-    {
-      id: 1,
-      exam_title: 'Science Knowledge Test',
-      subject: 'Science',
-      type: 'quiz',
-      date_taken: '2025-01-10T10:30:00',
-      score: 85,
-      passing_score: 70,
-      time_taken: 45,
-      time_limit: 60,
-      status: 'passed',
-      attempt_number: 1
-    },
-    {
-      id: 2,
-      exam_title: 'Filipino Language Test',
-      subject: 'Filipino',
-      type: 'pretest',
-      date_taken: '2025-01-08T14:15:00',
-      score: 78,
-      passing_score: 75,
-      time_taken: 70,
-      time_limit: 80,
-      status: 'passed',
-      attempt_number: 1
-    }
-  ];
+  const mockExamHistory = Array.isArray(examHistory) ? examHistory : [];
 
-  const mockUpcomingExams = upcomingExams.length > 0 ? upcomingExams : [
-    {
-      id: 1,
-      title: 'Mathematics Pretest',
-      subject: 'Mathematics',
-      scheduled_date: '2025-01-15T09:00:00',
-      duration: 90,
-      type: 'pretest'
-    },
-    {
-      id: 2,
-      title: 'English Communication Test',
-      subject: 'English',
-      scheduled_date: '2025-01-20T10:00:00',
-      duration: 75,
-      type: 'posttest'
-    }
-  ];
+  // Derive upcoming list from available exams when not explicitly provided
+  const mockUpcomingExams = (Array.isArray(upcomingExams) && upcomingExams.length > 0)
+    ? upcomingExams
+    : mockAvailableExams
+        .filter(e => e.status === 'upcoming')
+        .map(e => ({
+          id: e.id,
+          title: e.title,
+          subject: e.subject,
+          scheduled_date: e.available_from,
+          duration: e.time_duration,
+          type: e.type
+        }));
 
   const getExamStatusColor = (status) => {
     switch (status) {
@@ -381,13 +303,13 @@ export default function Exams({
                     sx={{ mb: 1, mr: 1 }}
                   />
                   <Chip
-                    label={exam.type.toUpperCase()}
+                    label={(exam?.type ? String(exam.type).toUpperCase() : 'EXAM')}
                     color="secondary"
                     size="small"
                     sx={{ mb: 1, mr: 1 }}
                   />
                   <Chip
-                    label={exam.status.toUpperCase()}
+                    label={(exam?.status ? String(exam.status).toUpperCase() : 'STATUS')}
                     color={getExamStatusColor(exam.status)}
                     size="small"
                     sx={{ mb: 2 }}
@@ -409,7 +331,7 @@ export default function Exams({
                     </Typography>
                   </Box>
 
-                  {exam.status === 'available' && (
+                  {exam.status === 'available' && exam.available_until && (
                     <Alert severity="info" sx={{ mb: 2 }}>
                       <Typography variant="body2">
                         Available until: {new Date(exam.available_until).toLocaleString()}
@@ -424,7 +346,7 @@ export default function Exams({
                     onClick={() => handleStartExam(exam)}
                     disabled={exam.status !== 'available' || exam.current_attempts >= exam.attempts_allowed}
                   >
-                    {exam.status === 'available' ? 'Take Exam' : exam.status.toUpperCase()}
+                    {exam.status === 'available' ? 'Take Exam' : (exam?.status ? String(exam.status).toUpperCase() : 'UNAVAILABLE')}
                   </Button>
                 </CardContent>
               </Card>
@@ -502,7 +424,7 @@ export default function Exams({
                     <Box>
                       <Typography variant="subtitle2">{exam.exam_title}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {exam.type.toUpperCase()} • Attempt #{exam.attempt_number}
+                        {(exam?.type ? String(exam.type).toUpperCase() : 'EXAM')} • Attempt #{exam.attempt_number}
                       </Typography>
                     </Box>
                   </TableCell>
@@ -525,7 +447,7 @@ export default function Exams({
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={exam.status.toUpperCase()}
+                      label={(exam?.status ? String(exam.status).toUpperCase() : 'STATUS')}
                       color={getResultStatusColor(exam.status)}
                       size="small"
                     />

@@ -304,7 +304,7 @@ export default function LearnerLayout({
           flexGrow: 1,
           width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
           minHeight: '100vh',
-          bgcolor: 'grey.50'
+          bgcolor: 'grey.50',
         }}
       >
         <Toolbar /> {/* Spacer for AppBar */}

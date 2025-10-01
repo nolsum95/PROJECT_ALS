@@ -16,7 +16,6 @@ class LearnerAttempt extends Model
     protected $fillable = [
         'fk_learner_id',
         'fk_qn_id',
-        'assessment_id',
         'attempt_no',
         'attempt_date',
         'status',
@@ -47,11 +46,6 @@ class LearnerAttempt extends Model
     public function questionnaire()
     {
         return $this->belongsTo(Questionnaire::class, 'fk_qn_id', 'qn_id');
-    }
-
-    public function assessment()
-    {
-        return $this->belongsTo(Assessment::class, 'assessment_id', 'assessment_id');
     }
 
     // Get classwork through questionnaire

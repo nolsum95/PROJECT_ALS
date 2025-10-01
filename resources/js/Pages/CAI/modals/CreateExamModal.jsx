@@ -25,6 +25,9 @@ export default function CreateExamModal({ open, onClose, subjects = [] }) {
     title: '',
     description: '',
     time_duration: 30,
+    available_at: '',
+    scheduled_post_at: '',
+    available_until: '',
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -52,6 +55,9 @@ export default function CreateExamModal({ open, onClose, subjects = [] }) {
 
     router.post(route('cai.exams.store'), {
       test_level: formData.test_level,
+      available_at: formData.available_at || null,
+      scheduled_post_at: formData.scheduled_post_at || null,
+      available_until: formData.available_until || null,
       questionnaire: {
         subject_id: formData.subject_id,
         title: formData.title,
@@ -66,6 +72,9 @@ export default function CreateExamModal({ open, onClose, subjects = [] }) {
           title: '',
           description: '',
           time_duration: 30,
+          available_at: '',
+          scheduled_post_at: '',
+          available_until: '',
         });
         setLoading(false);
         onClose();
@@ -86,6 +95,8 @@ export default function CreateExamModal({ open, onClose, subjects = [] }) {
       title: '',
       description: '',
       time_duration: 30,
+      scheduled_post_at: '',
+      available_until: '',
     });
     setErrors({});
     onClose();
@@ -192,16 +203,46 @@ export default function CreateExamModal({ open, onClose, subjects = [] }) {
             />
 
             <TextField
+            fullWidth
+            type="number"
+            label="Time Duration (minutes)"
+            value={formData.time_duration}
+            onChange={(e) => setFormData({ ...formData, time_duration: parseInt(e.target.value || '0') })}
+            inputProps={{ min: 1, max: 300 }}
+            error={!!errors.time_duration}
+            helperText={errors.time_duration || 'Duration between 1-300 minutes'}
+          />
+          {/* Optional scheduling fields */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2 }}>
+            <TextField
               fullWidth
-              type="number"
-              label="Time Duration (minutes)"
-              value={formData.time_duration}
-              onChange={(e) => setFormData({ ...formData, time_duration: parseInt(e.target.value || '0') })}
-              inputProps={{ min: 1, max: 300 }}
-              error={!!errors.time_duration}
-              helperText={errors.time_duration || 'Duration between 1-300 minutes'}
+              type="datetime-local"
+              label="Available At (optional)"
+              InputLabelProps={{ shrink: true }}
+              value={formData.available_at}
+              onChange={(e) => setFormData({ ...formData, available_at: e.target.value })}
+              helperText="When learners should start seeing the exam"
+            />
+            <TextField
+              fullWidth
+              type="datetime-local"
+              label="Schedule Post At (optional)"
+              InputLabelProps={{ shrink: true }}
+              value={formData.scheduled_post_at}
+              onChange={(e) => setFormData({ ...formData, scheduled_post_at: e.target.value })}
+              helperText="Legacy scheduler; kept for compatibility"
+            />
+            <TextField
+              fullWidth
+              type="datetime-local"
+              label="Available Until (optional)"
+              InputLabelProps={{ shrink: true }}
+              value={formData.available_until}
+              onChange={(e) => setFormData({ ...formData, available_until: e.target.value })}
+              helperText="When the exam should stop being available"
             />
           </Box>
+        </Box>
 
           {formData.subject_id && formData.title && (
             <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>

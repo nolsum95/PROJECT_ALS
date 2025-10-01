@@ -21,6 +21,8 @@ class Classwork extends Model
         'test_description',
         'posting_status',
         'scheduled_post_at',
+        'available_at',
+        'available_until',
         'file_path', // Keep temporarily for migration
         'file_name', // Keep temporarily for migration
         'file_size', // Keep temporarily for migration
@@ -30,6 +32,8 @@ class Classwork extends Model
 
     protected $casts = [
         'scheduled_post_at' => 'datetime',
+        'available_at' => 'datetime',
+        'available_until' => 'datetime',
     ];
 
     public function cai()
@@ -96,9 +100,12 @@ class Classwork extends Model
         }
 
         $now = now();
-        
-        // Check if scheduled to be available in the future
-        if ($this->scheduled_post_at && $now->lt($this->scheduled_post_at)) {
+
+        // Prefer available_at over scheduled_post_at if set
+        $startsAt = $this->available_at ?? $this->scheduled_post_at;
+
+        // Check if scheduled/available in the future
+        if ($startsAt && $now->lt($startsAt)) {
             return false;
         }
 

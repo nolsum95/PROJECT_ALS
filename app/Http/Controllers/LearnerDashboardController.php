@@ -16,7 +16,6 @@ use App\Models\Question;
 use App\Models\LearnerAttempt;
 use App\Models\LearnerAnswer;
 use App\Models\Modules;
-use App\Models\Assessment;
 use App\Models\Attendance;
 use App\Models\Subject;
 
@@ -30,6 +29,12 @@ class LearnerDashboardController extends Controller
         $user = $request->user();
         $learner = Learner::with(['clc', 'cai'])->where('fk_userId', $user->user_id)->first();
         
+        // Compute total exams from CAI-posted classworks (pre/post)
+        $totalExams = Classwork::where('fk_cai_id', $learner?->assigned_cai)
+            ->whereIn('test_level', ['pretest', 'posttest'])
+            ->where('posting_status', 'posted')
+            ->count();
+
         // Get learner statistics
         $stats = [
             'completedReviewers' => LearnerAttempt::where('fk_learner_id', $learner?->learner_id)
@@ -41,7 +46,7 @@ class LearnerDashboardController extends Controller
                 ->where('status', 'completed')
                 ->where('score', '>=', 75)
                 ->count(),
-            'totalExams' => Assessment::where('clc_id', $learner?->assigned_clc)->count(),
+            'totalExams' => $totalExams,
             'overallProgress' => $this->calculateOverallProgress($learner),
             'attendanceRate' => $this->calculateAttendanceRate($learner),
         ];
@@ -49,18 +54,165 @@ class LearnerDashboardController extends Controller
         // Get recent activities
         $recentActivities = $this->getRecentActivities($learner);
         
-        // Get upcoming exams
-        $upcomingExams = Assessment::where('clc_id', $learner?->assigned_clc)
-            ->where('schedule_date', '>', now())
-            ->orderBy('schedule_date')
+        // Get upcoming exams (same source/logic as Exams page: CAI-posted classworks pre/post)
+        $caiExams = Classwork::with(['questionnaires.subject'])
+            ->where('fk_cai_id', $learner?->assigned_cai)
+            ->whereIn('test_level', ['pretest', 'posttest'])
+            ->where('posting_status', 'posted')
+            ->get()
+            ->flatMap(function ($classwork) {
+                return $classwork->questionnaires->map(function ($qn) use ($classwork) {
+                    $scheduledAt = $classwork->available_at ?? $classwork->scheduled_post_at;
+                    $availableUntil = $classwork->available_until ?? null;
+                    $now = now();
+                    $status = ($scheduledAt && $now->lt($scheduledAt)) ? 'upcoming' : 'available';
+                    return [
+                        'id' => 'qn-' . $qn->qn_id,
+                        'title' => $qn->title,
+                        'subject' => $qn->subject->subject_name ?? 'General',
+                        'type' => $classwork->test_level,
+                        'time_duration' => $qn->time_duration ?? 30,
+                        'available_from' => $scheduledAt ? $scheduledAt->toIso8601String() : $classwork->created_at->toIso8601String(),
+                        'available_until' => $availableUntil ? $availableUntil->toIso8601String() : null,
+                        'status' => $status,
+                    ];
+                });
+            })
+            ->filter(function ($exam) {
+                return $exam['status'] === 'upcoming';
+            })
+            ->sortBy('available_from')
             ->take(5)
-            ->get();
+            ->values();
+
+        $upcomingExams = $caiExams;
 
         return Inertia::render('Learner/Dashboard', [
             'learner' => $learner,
             'stats' => $stats,
             'recentActivities' => $recentActivities,
             'upcomingExams' => $upcomingExams,
+        ]);
+    }
+
+    /**
+     * Take a CAI exam (pretest/posttest). The $examId can be 'qn-<id>' or a raw questionnaire id.
+     */
+    public function takeExam(Request $request, $examId)
+    {
+        $user = $request->user();
+        $learner = Learner::with(['clc', 'cai'])->where('fk_userId', $user->user_id)->first();
+
+        if (!$learner) {
+            return redirect()->route('learner.exams')->with('error', 'Learner not found.');
+        }
+
+        // Normalize id
+        $qnId = (is_string($examId) && str_starts_with($examId, 'qn-')) ? (int) str_replace('qn-', '', $examId) : (int) $examId;
+
+        // Load questionnaire under a posted pre/post classwork that belongs to learner's CAI
+        $questionnaire = Questionnaire::with(['questions', 'subject', 'classwork'])
+            ->where('qn_id', $qnId)
+            ->whereHas('classwork', function ($q) use ($learner) {
+                $q->where('fk_cai_id', $learner->assigned_cai)
+                  ->whereIn('test_level', ['pretest', 'posttest'])
+                  ->where('posting_status', 'posted');
+            })
+            ->first();
+
+        if (!$questionnaire) {
+            return redirect()->route('learner.exams')->with('error', 'Exam not found or not available.');
+        }
+
+        // Check availability window
+        $classwork = $questionnaire->classwork;
+        $now = now();
+        $availableFrom = $classwork->available_at ?? $classwork->scheduled_post_at ?? $classwork->created_at;
+        $availableUntil = $classwork->available_until;
+        if (($availableFrom && $now->lt($availableFrom)) || ($availableUntil && $now->gt($availableUntil))) {
+            return redirect()->route('learner.exams')->with('error', 'This exam is not currently available.');
+        }
+
+        // Check if already completed
+        $existingAttempt = LearnerAttempt::where('fk_learner_id', $learner->learner_id)
+            ->where('fk_qn_id', $qnId)
+            ->where('status', 'completed')
+            ->latest('completed_at')
+            ->first();
+
+        return Inertia::render('Learner/TakeExam', [
+            'learner' => $learner,
+            'questionnaire' => $questionnaire,
+            'questions' => $questionnaire->questions,
+            'existingAttempt' => $existingAttempt,
+        ]);
+    }
+
+    /**
+     * Submit exam answers. Do not show answers/results; just record and return.
+     */
+    public function submitExam(Request $request)
+    {
+        $validated = $request->validate([
+            'questionnaire_id' => 'required|exists:questionnaire_tb,qn_id',
+            'answers' => 'required|array',
+            'time_taken' => 'required|integer|min:0'
+        ]);
+
+        $user = $request->user();
+        $learner = Learner::where('fk_userId', $user->user_id)->first();
+
+        if (!$learner) {
+            return back()->withErrors(['error' => 'Learner not found.']);
+        }
+
+        // Load questionnaire and ensure it's an exam (pre/post) and posted
+        $questionnaire = Questionnaire::with(['questions', 'classwork'])
+            ->where('qn_id', $validated['questionnaire_id'])
+            ->first();
+
+        if (!$questionnaire || !in_array($questionnaire->classwork?->test_level, ['pretest', 'posttest']) || $questionnaire->classwork?->posting_status !== 'posted') {
+            return back()->withErrors(['error' => 'Invalid exam.']);
+        }
+
+        // Compute score
+        $totalQuestions = $questionnaire->questions->count();
+        $correct = 0;
+        foreach ($questionnaire->questions as $q) {
+            $ans = $validated['answers'][$q->question_id] ?? null;
+            if ($ans && $ans === $q->ans_key) {
+                $correct++;
+            }
+        }
+        $score = $totalQuestions > 0 ? round(($correct / $totalQuestions) * 100, 2) : 0;
+
+        // Store attempt
+        LearnerAttempt::updateOrCreate(
+            [
+                'fk_learner_id' => $learner->learner_id,
+                'fk_qn_id' => $validated['questionnaire_id']
+            ],
+            [
+                'score' => $score,
+                'time_taken' => $validated['time_taken'],
+                'status' => 'completed',
+                'completed_at' => now(),
+                'passing_score' => 70,
+                'is_passed' => $score >= 70,
+            ]
+        );
+
+        // Return with result details so frontend can show a results modal
+        $wrong = max(0, $totalQuestions - $correct);
+        return back()->with([
+            'success' => 'Exam submitted successfully.',
+            'exam_result' => [
+                'total' => $totalQuestions,
+                'correct' => $correct,
+                'wrong' => $wrong,
+                'percentage' => $score,
+                'passed' => $score >= 70,
+            ]
         ]);
     }
 
@@ -216,7 +368,7 @@ class LearnerDashboardController extends Controller
 
         // Get available modules
         $modules = Modules::where('fk_clc_id', $learner?->assigned_clc)
-            ->with(['fileStorage'])
+            ->with(['file'])
             ->get()
             ->map(function ($module) {
                 return [
@@ -224,8 +376,8 @@ class LearnerDashboardController extends Controller
                     'title' => $module->subject,
                     'subject' => $module->subject,
                     'description' => $module->description,
-                    'file_type' => $module->fileStorage?->file_type ?? 'PDF',
-                    'file_size' => $module->fileStorage ? $this->formatFileSize($module->fileStorage->file_size) : 'N/A',
+                    'file_type' => $module->file?->file_type ?? 'PDF',
+                    'file_size' => $module->file ? $this->formatFileSize($module->file->file_size) : 'N/A',
                     'uploaded_date' => $module->created_at->toDateString(),
                     'downloaded' => false, // TODO: Track downloads
                 ];
@@ -283,37 +435,58 @@ class LearnerDashboardController extends Controller
         $user = $request->user();
         $learner = Learner::with(['clc', 'cai'])->where('fk_userId', $user->user_id)->first();
 
-        // Get available exams
-        $availableExams = Assessment::where('clc_id', $learner?->assigned_clc)
-            ->where('status', 'active')
+        // Get available exams from CAI-posted classworks (pretest/posttest) assigned to this learner's CAI
+        $caiExams = Classwork::with(['questionnaires.subject', 'questionnaires.questions'])
+            ->where('fk_cai_id', $learner?->assigned_cai)
+            ->whereIn('test_level', ['pretest', 'posttest'])
+            ->where('posting_status', 'posted')
+            ->orderByDesc('created_at')
             ->get()
-            ->map(function ($exam) use ($learner) {
-                $attempts = LearnerAttempt::where('fk_learner_id', $learner?->learner_id)
-                    ->where('assessment_id', $exam->assessment_id)
-                    ->count();
+            ->flatMap(function ($classwork) use ($learner) {
+                // Map each questionnaire under this classwork as an available exam
+                return $classwork->questionnaires->map(function ($qn) use ($classwork, $learner) {
+                    $attempts = LearnerAttempt::where('fk_learner_id', $learner?->learner_id)
+                        ->where('fk_qn_id', $qn->qn_id)
+                        ->count();
 
-                return [
-                    'id' => $exam->assessment_id,
-                    'title' => $exam->title,
-                    'subject' => 'General', // TODO: Add subject to assessments
-                    'type' => $exam->assessment_type,
-                    'description' => $exam->description,
-                    'questions_count' => 40, // TODO: Add to assessments table
-                    'time_duration' => 90, // TODO: Add to assessments table
-                    'passing_score' => 75, // TODO: Add to assessments table
-                    'available_from' => $exam->schedule_date,
-                    'available_until' => $exam->schedule_date ? 
-                        \Carbon\Carbon::parse($exam->schedule_date)->addHours(8) : null,
-                    'status' => $this->getExamStatus($exam),
-                    'attempts_allowed' => 1,
-                    'current_attempts' => $attempts,
-                ];
+                    // Determine status based on availability window
+                    $scheduledAt = $classwork->available_at ?? $classwork->scheduled_post_at;
+                    $availableUntil = $classwork->available_until ?? null;
+                    $now = now();
+                    if ($scheduledAt && $now->lt($scheduledAt)) {
+                        $status = 'upcoming';
+                    } else {
+                        $status = 'available';
+                    }
+
+                    return [
+                        'id' => 'qn-' . $qn->qn_id,
+                        'title' => $qn->title,
+                        'subject' => $qn->subject->subject_name ?? 'General',
+                        'type' => $classwork->test_level,
+                        'description' => $qn->description,
+                        'questions_count' => $qn->questions->count(),
+                        'time_duration' => $qn->time_duration ?? 30,
+                        'passing_score' => 70,
+                        'available_from' => $scheduledAt ? $scheduledAt->toIso8601String() : $classwork->created_at->toIso8601String(),
+                        'available_until' => $availableUntil ? $availableUntil->toIso8601String() : null,
+                        'status' => $status,
+                        'attempts_allowed' => 1,
+                        'current_attempts' => $attempts,
+                    ];
+                });
             });
 
-        // Get exam history
+        // Use only CAI exams for learner
+        $availableExams = $caiExams->values();
+
+        // Get exam history (only attempts from CAI Exams: pretest/posttest)
         $examHistory = LearnerAttempt::where('fk_learner_id', $learner?->learner_id)
-            ->with(['questionnaire'])
+            ->with(['questionnaire.subject', 'questionnaire.classwork'])
             ->where('status', 'completed')
+            ->whereHas('questionnaire.classwork', function ($q) {
+                $q->whereIn('test_level', ['pretest', 'posttest']);
+            })
             ->orderBy('completed_at', 'desc')
             ->get()
             ->map(function ($attempt) {
@@ -321,13 +494,13 @@ class LearnerDashboardController extends Controller
                     'id' => $attempt->attempt_id,
                     'exam_title' => $attempt->questionnaire?->title ?? 'Unknown Exam',
                     'subject' => $attempt->questionnaire?->subject?->subject_name ?? 'General',
-                    'type' => 'quiz', // TODO: Determine from questionnaire
+                    'type' => $attempt->questionnaire?->classwork?->test_level ?? 'exam',
                     'date_taken' => $attempt->completed_at,
                     'score' => $attempt->score,
-                    'passing_score' => 75,
+                    'passing_score' => 70,
                     'time_taken' => $attempt->time_taken ?? 0,
                     'time_limit' => $attempt->questionnaire?->time_duration ?? 0,
-                    'status' => $attempt->score >= 75 ? 'passed' : 'failed',
+                    'status' => $attempt->score >= 70 ? 'passed' : 'failed',
                     'attempt_number' => 1, // TODO: Calculate
                 ];
             });
@@ -389,19 +562,145 @@ class LearnerDashboardController extends Controller
     }
 
     /**
+     * Submit reviewer answers
+     */
+    public function submitReviewer(Request $request)
+    {
+        $validated = $request->validate([
+            'questionnaire_id' => 'required|exists:questionnaire_tb,qn_id',
+            'answers' => 'required|array',
+            'time_taken' => 'required|integer|min:0'
+        ]);
+
+        $user = $request->user();
+        $learner = Learner::where('fk_userId', $user->user_id)->first();
+        
+        if (!$learner) {
+            return back()->withErrors(['error' => 'Learner not found.']);
+        }
+
+        // Get the questionnaire with questions
+        $questionnaire = Questionnaire::with(['questions'])
+            ->where('qn_id', $validated['questionnaire_id'])
+            ->first();
+
+        if (!$questionnaire) {
+            return back()->withErrors(['error' => 'Questionnaire not found.']);
+        }
+
+        // Calculate score
+        $totalQuestions = $questionnaire->questions->count();
+        $correctAnswers = 0;
+
+        foreach ($questionnaire->questions as $question) {
+            $userAnswer = $validated['answers'][$question->question_id] ?? null;
+            if ($userAnswer && $userAnswer === $question->ans_key) {
+                $correctAnswers++;
+            }
+        }
+
+        $score = $totalQuestions > 0 ? round(($correctAnswers / $totalQuestions) * 100, 2) : 0;
+
+        // Create or update learner attempt
+        $attempt = LearnerAttempt::updateOrCreate(
+            [
+                'fk_learner_id' => $learner->learner_id,
+                'fk_qn_id' => $validated['questionnaire_id']
+            ],
+            [
+                'score' => $score,
+                'time_taken' => $validated['time_taken'],
+                'status' => 'completed',
+                'completed_at' => now()
+            ]
+        );
+
+        // Store individual answers (using correct table structure)
+        foreach ($validated['answers'] as $questionId => $answer) {
+            $question = $questionnaire->questions->where('question_id', $questionId)->first();
+            if ($question) {
+                LearnerAnswer::updateOrCreate(
+                    [
+                        'fk_learner_id' => $learner->learner_id,
+                        'fk_question_id' => $questionId
+                    ],
+                    [
+                        'selected_option' => $answer,
+                        'is_correct' => $answer === $question->ans_key,
+                        'answered_at' => now()
+                    ]
+                );
+            }
+        }
+
+        return redirect("/learner/reviewers/{$validated['questionnaire_id']}/results")->with('success', 
+            "Reviewer completed! Your score: {$score}% ({$correctAnswers}/{$totalQuestions} correct)"
+        );
+    }
+
+    /**
+     * Show reviewer results
+     */
+    public function reviewerResults(Request $request, $reviewerId)
+    {
+        $user = $request->user();
+        $learner = Learner::with(['clc', 'cai'])->where('fk_userId', $user->user_id)->first();
+
+        if (!$learner) {
+            return redirect()->route('learner.reviewers')
+                ->with('error', 'Learner not found.');
+        }
+
+        // Get the questionnaire with questions
+        $questionnaire = Questionnaire::with(['questions', 'subject', 'classwork'])
+            ->where('qn_id', $reviewerId)
+            ->first();
+
+        if (!$questionnaire) {
+            return redirect()->route('learner.reviewers')
+                ->with('error', 'Reviewer not found.');
+        }
+
+        // Get the learner's latest attempt for this questionnaire
+        $attempt = LearnerAttempt::where('fk_learner_id', $learner->learner_id)
+            ->where('fk_qn_id', $reviewerId)
+            ->where('status', 'completed')
+            ->latest('completed_at')
+            ->first();
+
+        if (!$attempt) {
+            return redirect()->route('learner.reviewers')
+                ->with('error', 'No completed attempt found for this reviewer.');
+        }
+
+        // Get the learner's answers for this attempt
+        $answers = LearnerAnswer::where('fk_learner_id', $learner->learner_id)
+            ->whereIn('fk_question_id', $questionnaire->questions->pluck('question_id'))
+            ->get();
+
+        return Inertia::render('Learner/ReviewerResults', [
+            'learner' => $learner,
+            'attempt' => $attempt,
+            'questionnaire' => $questionnaire,
+            'questions' => $questionnaire->questions,
+            'answers' => $answers,
+        ]);
+    }
+
+    /**
      * Download module
      */
     public function downloadModule(Request $request, $moduleId)
     {
-        $module = Modules::with('fileStorage')->findOrFail($moduleId);
+        $module = Modules::with('file')->findOrFail($moduleId);
         
-        if (!$module->fileStorage || !Storage::disk('public')->exists($module->fileStorage->file_path)) {
+        if (!$module->file || !Storage::disk('public')->exists($module->file->file_path)) {
             return back()->withErrors(['error' => 'File not found.']);
         }
 
         return Storage::disk('public')->download(
-            $module->fileStorage->file_path,
-            $module->fileStorage->original_filename
+            $module->file->file_path,
+            $module->file->original_filename
         );
     }
 
@@ -458,19 +757,7 @@ class LearnerDashboardController extends Controller
         return [];
     }
 
-    private function getExamStatus($exam)
-    {
-        $now = now();
-        $scheduleDate = \Carbon\Carbon::parse($exam->schedule_date);
-        
-        if ($scheduleDate->isFuture()) {
-            return 'upcoming';
-        } elseif ($scheduleDate->isToday() || $scheduleDate->diffInHours($now) <= 8) {
-            return 'available';
-        } else {
-            return 'expired';
-        }
-    }
+    // Removed getExamStatus() helper as exams now derive from CAI classworks, not assessments
 
     private function getExamProgressData($learner)
     {

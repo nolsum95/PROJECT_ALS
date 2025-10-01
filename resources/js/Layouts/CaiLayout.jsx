@@ -7,16 +7,18 @@ import {
   Typography,
   Button,
   Box,
+  Chip,
   useTheme,
   useMediaQuery
 } from '@mui/material';
 import {
   Menu as MenuIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { showConfirm } from '@/Utils/sweetalert';
 import { router } from '@inertiajs/react';
-import '../../css/cai-layout.css';
+// Removed unused CSS import to align with LearnerLayout visual styling
 
 const DRAWER_WIDTH = 280;
 const COLLAPSED_WIDTH = 64;
@@ -94,9 +96,9 @@ export default function CaiLayout({ children, title = 'CAI Dashboard', auth, sel
               easing: theme.transitions.easing.sharp,
               duration: theme.transitions.duration.enteringScreen,
             }),
-            backgroundColor: '#182f54',
-            color: '#fff',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            backgroundColor: 'white',
+            color: 'text.primary',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
             zIndex: theme.zIndex.drawer + 1,
           }}
         >
@@ -114,15 +116,24 @@ export default function CaiLayout({ children, title = 'CAI Dashboard', auth, sel
             <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
               {title}
             </Typography>
+            {/* Status Indicator (parity with LearnerLayout) */}
+            <Chip
+              icon={<CheckCircleIcon />}
+              label="Active"
+              color="success"
+              size="small"
+              variant="outlined"
+              sx={{ mr: 1 }}
+            />
             
             <Button
               color="inherit"
               onClick={handleLogout}
               startIcon={<LogoutIcon />}
               sx={{ 
-                color: '#fff',
+                color: 'text.primary',
                 '&:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.1)'
+                  backgroundColor: 'action.hover'
                 }
               }}
             >
@@ -132,9 +143,30 @@ export default function CaiLayout({ children, title = 'CAI Dashboard', auth, sel
         </AppBar>
 
         {/* Page Content */}
-        <div className="cai-page-content">
+        <Box
+          className="cai-page-content"
+          sx={{
+            bgcolor: 'grey.50',
+            minHeight: '100vh',
+            width: {
+              sm: `calc(100% - ${sidebarOpen ? DRAWER_WIDTH : COLLAPSED_WIDTH}px)`,
+              xs: '100%'
+            },
+            ml: {
+              sm: `${sidebarOpen ? DRAWER_WIDTH : COLLAPSED_WIDTH}px`,
+              xs: 0
+            },
+            transition: theme.transitions.create(['width', 'margin'], {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+            }),
+            p: 3,
+          }}
+        >
+          {/* Spacer for fixed AppBar height */}
+          <Toolbar />
           {children}
-        </div>
+        </Box>
       </div>
     </div>
   );

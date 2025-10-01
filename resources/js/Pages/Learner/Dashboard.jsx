@@ -90,17 +90,70 @@ export default function LearnerDashboard({
 
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 600, color: 'text.primary', mb: 1 }}>
-          Welcome back, {displayName}! 👋
+          Welcome back, {displayName}!
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Continue your ALS learning journey. You're doing great!
         </Typography>
-      </Box>
-
+      </Box>  
+     {/* Quick Actions */}
+        <Grid item xs={12} marginBottom={3}>
+          <Paper sx={{ p: 3, bgcolor: 'primary.main', color: 'white' }}>
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              Quick Actions
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={3}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
+                  startIcon={<QuizIcon />}
+                  href={route('learner.reviewers')}
+                >
+                  Study Materials
+                </Button>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
+                  startIcon={<AssessmentIcon />}
+                  href={route('learner.exams')}
+                >
+                  Take Exam
+                </Button>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
+                  startIcon={<TrendingUpIcon />}
+                  href={route('learner.progress')}
+                >
+                  View Progress
+                </Button>
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
+                  startIcon={<PersonIcon />}
+                  href={route('learner.profile')}
+                >
+                  Update Profile
+                </Button>
+              </Grid>
+            </Grid>
+          </Paper>
+        </Grid>
       <Grid container spacing={3}>
         {/* Profile Card */}
-        <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+        <Grid item xs={1} md={4}>
+          <Card sx={{ height: '100%', background: 'linear-gradient(135deg, #667eea 0%, #4256afff 100%)' }}>
             <CardContent sx={{ color: 'white', textAlign: 'center', py: 4 }}>
               <Avatar
                 sx={{
@@ -112,7 +165,7 @@ export default function LearnerDashboard({
                   fontSize: '2rem'
                 }}
               >
-                {displayName.charAt(0).toUpperCase()}
+                {(displayName?.charAt?.(0) || 'L').toUpperCase()}
               </Avatar>
               
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
@@ -241,60 +294,16 @@ export default function LearnerDashboard({
                 />
               </Box>
               
-              <Alert severity="info" sx={{ mt: 2 }}>
+              {/* <Alert severity="info" sx={{ mt: 2 }}>
                 <Typography variant="body2">
                   You're currently enrolled in <strong>{mockStats.currentGrade}</strong> program. 
                   Keep up the excellent work!
                 </Typography>
-              </Alert>
+              </Alert> */}
+              
             </CardContent>
           </Card>
-        </Grid>
-
-        {/* Upcoming Exams */}
-        <Grid item xs={12} md={6}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <ScheduleIcon sx={{ mr: 1, color: 'primary.main' }} />
-                <Typography variant="h6">Upcoming Exams</Typography>
-              </Box>
-              
-              <List>
-                {mockUpcomingExams.map((exam, index) => (
-                  <React.Fragment key={exam.id}>
-                    <ListItem sx={{ px: 0 }}>
-                      <ListItemIcon>
-                        <CalendarIcon color="primary" />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={exam.title}
-                        secondary={`${exam.date} • ${exam.type.toUpperCase()}`}
-                      />
-                      <ListItemSecondaryAction>
-                        <IconButton size="small" color="primary">
-                          <PlayArrowIcon />
-                        </IconButton>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                    {index < mockUpcomingExams.length - 1 && <Divider />}
-                  </React.Fragment>
-                ))}
-              </List>
-              
-              <Button 
-                fullWidth 
-                variant="outlined" 
-                sx={{ mt: 2 }}
-                href={route('learner.exams')}
-              >
-                View All Exams
-              </Button>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Recent Activities */}
+              {/* Recent Activities */}
         <Grid item xs={12} md={6}>
           <Card sx={{ height: '100%' }}>
             <CardContent>
@@ -332,60 +341,53 @@ export default function LearnerDashboard({
           </Card>
         </Grid>
 
-        {/* Quick Actions */}
-        <Grid item xs={12}>
-          <Paper sx={{ p: 3, bgcolor: 'primary.main', color: 'white' }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              Quick Actions
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={3}>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
-                  startIcon={<QuizIcon />}
-                  href={route('learner.reviewers')}
-                >
-                  Study Materials
-                </Button>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
-                  startIcon={<AssessmentIcon />}
-                  href={route('learner.exams')}
-                >
-                  Take Exam
-                </Button>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
-                  startIcon={<TrendingUpIcon />}
-                  href={route('learner.progress')}
-                >
-                  View Progress
-                </Button>
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <Button
-                  fullWidth
-                  variant="contained"
-                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', '&:hover': { bgcolor: 'rgba(255,255,255,0.3)' } }}
-                  startIcon={<PersonIcon />}
-                  href={route('learner.profile')}
-                >
-                  Update Profile
-                </Button>
-              </Grid>
-            </Grid>
-          </Paper>
         </Grid>
+
+        {/* Upcoming Exams */}
+        {/* <Grid item xs={12} md={6}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <ScheduleIcon sx={{ mr: 1, color: 'primary.main' }} />
+                <Typography variant="h6">Upcoming Exams</Typography>
+              </Box>
+              
+              <List>
+                {mockUpcomingExams.map((exam, index) => (
+                  <React.Fragment key={exam.id}>
+                    <ListItem sx={{ px: 0 }}>
+                      <ListItemIcon>
+                        <CalendarIcon color="primary" />
+                      </ListItemIcon> 
+                      <ListItemText
+                        primary={exam.title}
+                        secondary={`${exam.date} • ${(exam?.type ? String(exam.type).toUpperCase() : 'EXAM')}`}
+                      />
+                      <ListItemSecondaryAction>
+                        <IconButton size="small" color="primary">
+                          <PlayArrowIcon />
+                        </IconButton>
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                    {index < mockUpcomingExams.length - 1 && <Divider />}
+                  </React.Fragment>
+                ))}
+              </List>
+              
+              <Button 
+                fullWidth 
+                variant="outlined" 
+                sx={{ mt: 2 }}
+                href={route('learner.exams')}
+              >
+                View All Exams
+              </Button>
+            </CardContent>
+          </Card>
+        </Grid> */}
+
+    
+   
       </Grid>
     </LearnerLayout>
   );

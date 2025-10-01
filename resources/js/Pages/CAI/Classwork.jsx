@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CaiLayout from '../../Layouts/CaiLayout';
 import AddSubjectModal from './modals/AddSubjectModal';
-import { router, Head } from '@inertiajs/react';
+import AddReviewerModal from './modals/AddReviewerModal';
+import { router, Head, usePage } from '@inertiajs/react';
+import Swal from 'sweetalert2';
 import {
   Card,
   CardContent,
   Typography,
-  Grid,
   Box,
   Table,
   TableBody,
@@ -34,29 +35,30 @@ import {
   Checkbox,
   FormControlLabel,
   Toolbar,
-  Stack
+  Stack,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import {
   Quiz as QuizIcon,
   Assignment as AssignmentIcon,
   CheckCircle as CheckCircleIcon,
-  Schedule as ScheduleIcon,
-  Group as GroupIcon,
   Add as AddIcon,
   Visibility as VisibilityIcon,
-  Save as SaveIcon,
-  Cancel as CancelIcon,
-  AssignmentTurnedIn as AssignmentTurnedInIcon,
-  TrendingUp as TrendingUpIcon,
-  School as SchoolIcon,
-  Timer as TimerIcon,
   PostAdd as PostAddIcon,
-  Settings as SettingsIcon,
-  Close as CloseIcon
+  School as SchoolIcon,
+  Subject as SubjectIcon,
+  Close as CloseIcon,
+  Delete as DeleteIcon,
+  Publish as PublishIcon,
+  Archive as ArchiveIcon,
+  Cancel as CancelIcon,
+  Save as SaveIcon
 } from '@mui/icons-material';
-import '../../../css/adminTables.css';
+// Removed legacy admin table CSS to use pure MUI theming for a cleaner look
 
-export default function CaiClasswork({ auth, cai, classworks, subjects }) {
+
+export default function CaiClasswork({ auth, cai, classworks, subjects, reviewerSuccessCount }) {
   const [selectedClasswork, setSelectedClasswork] = useState(null);
   const [viewDetailsOpen, setViewDetailsOpen] = useState(false);
   const [addSubjectOpen, setAddSubjectOpen] = useState(false);
@@ -102,7 +104,17 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
     description: ''
   });
   const [createClassworkOpen, setCreateClassworkOpen] = useState(false);
-  
+  const { flash } = usePage().props || {};
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+
+  useEffect(() => {
+    if (flash?.success) {
+      setSnackbar({ open: true, message: flash.success, severity: 'success' });
+    } else if (flash?.error) {
+      setSnackbar({ open: true, message: flash.error, severity: 'error' });
+    }
+  }, [flash?.success, flash?.error]);
+
   // Multi-step questionnaire creation
   const [currentStep, setCurrentStep] = useState(1); // 1: Setup, 2: Questions
   const [currentQuestionnaireId, setCurrentQuestionnaireId] = useState(null);
@@ -127,7 +139,9 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
   const handleCreateClasswork = () => {
     // Structure the data to include both classwork and questionnaire information
     const classworkData = {
-      test_level: newClasswork.test_level,
+      test_level: 'reviewer',
+      test_title: newClasswork.title,
+      test_description: newClasswork.description,
       // Include questionnaire data if provided
       questionnaire: {
         subject_id: newClasswork.subject_id,
@@ -137,9 +151,9 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
       }
     };
 
-    router.post(route('cai.classwork.store'), classworkData, {
+    router.post('/cai/classwork', classworkData, {
       onSuccess: () => {
-        setNewClasswork({ 
+        setNewClasswork({
           test_level: 'reviewer',
           subject_id: '',
           time_duration: 30,
@@ -147,6 +161,9 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
           description: ''
         });
         setCreateClassworkOpen(false);
+      },
+      onError: (errors) => {
+        console.error('Error creating classwork:', errors);
       }
     });
   };
@@ -175,14 +192,97 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
         option_a: '',
         option_b: '',
         option_c: '',
-        option_d: '',
         correct_answer: 'A'
       });
     }
   };
 
-  const handleRemoveQuestion = (questionId) => {
+  const handleDeleteQuestion = (questionId) => {
     setQuestions(questions.filter(q => q.id !== questionId));
+  };
+
+  // Handle posting classwork to learners
+  const handlePostClasswork = (classwork) => {
+    Swal.fire({
+      title: 'Post Classwork to Learners?',
+      html: `Are you sure you want to post <strong>"${classwork.test_title}"</strong> to learners?<br><br>This will make it visible to all learners in your CLC.`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#10b981',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, Post it!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
+    }).then((result) => {
+      if (result.isConfirmed) {
+        router.post('/cai/classwork/post', {
+          classwork_id: classwork.classwork_id
+        }, {
+          onSuccess: () => {
+            Swal.fire({
+              title: 'Posted Successfully!',
+              text: `"${classwork.test_title}" is now visible to learners.`,
+              icon: 'success',
+              confirmButtonColor: '#10b981',
+              timer: 3000,
+              timerProgressBar: true
+            });
+            router.reload({ only: ['classworks'] });
+          },
+          onError: (errors) => {
+            console.error('Error posting classwork:', errors);
+            Swal.fire({
+              title: 'Error!',
+              text: 'Failed to post classwork. Please try again.',
+              icon: 'error',
+              confirmButtonColor: '#ef4444'
+            });
+          }
+        });
+      }
+    });
+  };
+
+  // Handle archiving classwork from learners
+  const handleArchiveClasswork = (classwork) => {
+    Swal.fire({
+      title: 'Archive Classwork?',
+      html: `Are you sure you want to archive <strong>"${classwork.test_title}"</strong>?<br><br>This will hide it from learners until you post it again.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#f59e0b',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, Archive it!',
+      cancelButtonText: 'Cancel',
+      reverseButtons: true
+    }).then((result) => {
+      if (result.isConfirmed) {
+        router.post('/cai/classwork/archive', {
+          classwork_id: classwork.classwork_id
+        }, {
+          onSuccess: () => {
+            Swal.fire({
+              title: 'Archived Successfully!',
+              text: `"${classwork.test_title}" has been hidden from learners.`,
+              icon: 'success',
+              confirmButtonColor: '#f59e0b',
+              timer: 3000,
+              timerProgressBar: true
+            });
+            router.reload({ only: ['classworks'] });
+          },
+          onError: (errors) => {
+            console.error('Error archiving classwork:', errors);
+            Swal.fire({
+              title: 'Error!',
+              text: 'Failed to archive classwork. Please try again.',
+              icon: 'error',
+              confirmButtonColor: '#ef4444'
+            });
+          }
+        });
+      }
+    });
   };
 
   const handleSaveQuestions = () => {
@@ -195,13 +295,16 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
           option_b: q.option_b,
           option_c: q.option_c,
           option_d: q.option_d,
-          correct_answer: q.correct_answer
+          ans_key: q.correct_answer || q.ans_key
         }))
       };
 
-      router.post(route('cai.classwork.questions.store'), questionsData, {
+      router.post('/cai/classwork/questions', questionsData, {
         onSuccess: () => {
           handleResetQuestionnaire();
+        },
+        onError: (errors) => {
+          console.error('Error saving questions:', errors);
         }
       });
     }
@@ -280,18 +383,18 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
   };
 
   const handleQuestionChange = (questionId, field, value) => {
-    setQuestionsData(prev => prev.map(q => 
+    setQuestionsData(prev => prev.map(q =>
       q.id === questionId ? { ...q, [field]: value } : q
     ));
   };
 
   const handleSaveNewQuestions = () => {
     // Validate that all questions have required fields
-    const isValid = questionsData.every(q => 
-      q.question_text.trim() && 
-      q.option_a.trim() && 
-      q.option_b.trim() && 
-      q.option_c.trim() && 
+    const isValid = questionsData.every(q =>
+      q.question_text.trim() &&
+      q.option_a.trim() &&
+      q.option_b.trim() &&
+      q.option_c.trim() &&
       q.option_d.trim()
     );
 
@@ -308,18 +411,18 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
     }
 
     // Submit questions to backend
-    const formattedQuestions = questionsData.map(q => ({
+    const questionsToSubmit = questionsData.map(q => ({
       question_text: q.question_text,
       option_a: q.option_a,
       option_b: q.option_b,
       option_c: q.option_c,
       option_d: q.option_d,
-      ans_key: q.correct_answer
+      ans_key: q.correct_answer || q.ans_key
     }));
 
     router.post('/cai/classwork/questions', {
       questionnaire_id: questionnaire.qn_id,
-      questions: formattedQuestions
+      questions: questionsToSubmit
     }, {
       onSuccess: () => {
         setAddQuestionsOpen(false);
@@ -368,7 +471,7 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
   };
 
   const getTestLevelColor = (level) => {
-    switch(level) {
+    switch (level) {
       case 'reviewer': return 'info';
       case 'pretest': return 'warning';
       case 'posttest': return 'success';
@@ -377,7 +480,7 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
   };
 
   const getTestLevelLabel = (level) => {
-    switch(level) {
+    switch (level) {
       case 'reviewer': return 'Reviewer';
       case 'pretest': return 'Pre-test';
       case 'posttest': return 'Post-test';
@@ -388,7 +491,7 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
   // Filter classworks based on search and test type
   const filteredClassworks = classworks.filter(classwork => {
     const matchesSearch = (classwork.test_title || '').toLowerCase().includes(search.toLowerCase()) ||
-                         (classwork.test_description || '').toLowerCase().includes(search.toLowerCase());
+      (classwork.test_description || '').toLowerCase().includes(search.toLowerCase());
     const matchesType = testTypeFilter === 'All' || classwork.test_level === testTypeFilter;
     return matchesSearch && matchesType;
   });
@@ -396,87 +499,79 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
   return (
     <CaiLayout user={auth?.user} selectedSection="classwork">
       <Head title="Classwork Management" />
-      
+
       <Box sx={{ width: '100%', p: 3 }}>
         {/* Summary Cards */}
-        <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Box>
-                    <Typography color="textSecondary" gutterBottom variant="body2">
-                      Total Tests
-                    </Typography>
-                    <Typography variant="h4" color="primary">
-                      {classworks?.length || 0}
-                    </Typography>
-                  </Box>
-                  <QuizIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.7 }} />
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 3, mb: 4 }}>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography color="textSecondary" gutterBottom variant="body2">
+                    Total Tests
+                  </Typography>
+                  <Typography variant="h4" color="primary">
+                    {classworks?.length || 0}
+                  </Typography>
                 </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Box>
-                    <Typography color="textSecondary" gutterBottom variant="body2">
-                      Questionnaires
-                    </Typography>
-                    <Typography variant="h4" color="success">
-                      {classworks?.reduce((acc, cw) => acc + (cw.questionnaires?.length || 0), 0) || 0}
-                    </Typography>
-                  </Box>
-                  <AssignmentIcon sx={{ fontSize: 40, color: 'success.main', opacity: 0.7 }} />
+                <QuizIcon sx={{ fontSize: 40, color: 'primary.main', opacity: 0.7 }} />
+              </Box>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography color="textSecondary" gutterBottom variant="body2">
+                    Questionnaires
+                  </Typography>
+                  <Typography variant="h4" color="success">
+                    {classworks?.reduce((acc, cw) => acc + (cw.questionnaires?.length || 0), 0) || 0}
+                  </Typography>
                 </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Box>
-                    <Typography color="textSecondary" gutterBottom variant="body2">
-                      Available Subjects
-                    </Typography>
-                    <Typography variant="h4" color="info">
-                      {subjects?.length || 0}
-                    </Typography>
-                    <Button
-                      size="small"
-                      startIcon={<AddIcon />}
-                      onClick={() => setAddSubjectOpen(true)}
-                      sx={{ mt: 1 }}
-                    >
-                      Add Subject
-                    </Button>
-                  </Box>
-                  <SchoolIcon sx={{ fontSize: 40, color: 'info.main', opacity: 0.7 }} />
+                <AssignmentIcon sx={{ fontSize: 40, color: 'success.main', opacity: 0.7 }} />
+              </Box>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography color="textSecondary" gutterBottom variant="body2">
+                    Available Subjects
+                  </Typography>
+                  <Typography variant="h4" color="info">
+                    {subjects?.length || 0}
+                  </Typography>
+                  <Button
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={() => setAddSubjectOpen(true)}
+                    sx={{ mt: 1 }}
+                  >
+                    Add Subject
+                  </Button>
                 </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Box display="flex" alignItems="center" justifyContent="space-between">
-                  <Box>
-                    <Typography color="textSecondary" gutterBottom variant="body2">
-                      Test Types
-                    </Typography>
-                    <Typography variant="h4" color="warning">
-                      3
-                    </Typography>
-                  </Box>
-                  <TimerIcon sx={{ fontSize: 40, color: 'warning.main', opacity: 0.7 }} />
+                <SchoolIcon sx={{ fontSize: 40, color: 'info.main', opacity: 0.7 }} />
+              </Box>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent>
+              <Box display="flex" alignItems="center" justifyContent="space-between">
+                <Box>
+                  <Typography color="textSecondary" gutterBottom variant="body2">
+                    Learners Completed Reviewers
+                  </Typography>
+                  <Typography variant="h4" color="success">
+                    {reviewerSuccessCount ?? 0}
+                  </Typography>
                 </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+                <CheckCircleIcon sx={{ fontSize: 40, color: 'success.main', opacity: 0.7 }} />
+              </Box>
+            </CardContent>
+          </Card>
+        </Box>
 
         {/* Action Buttons */}
         <Box sx={{ mb: 3, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -484,7 +579,7 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
             variant="contained"
             startIcon={<AddIcon />}
             onClick={() => setCreateClassworkOpen(true)}
-            sx={{ 
+            sx={{
               backgroundColor: '#3b82f6',
               '&:hover': { backgroundColor: '#2563eb' }
             }}
@@ -505,46 +600,27 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
               InputProps={{ sx: { color: '#e5e7eb' } }}
               sx={{ minWidth: 280, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.15)' } }}
             />
-            <TextField
-              select
-              variant="outlined"
-              size="small"
-              value={testTypeFilter}
-              onChange={(e) => setTestTypeFilter(e.target.value)}
-              SelectProps={{
-                MenuProps: {
-                  PaperProps: {
-                    sx: { backgroundColor: '#161e31ff', color: '#e5e7eb', '& .MuiMenuItem-root': { color: '#e5e7eb' } }
-                  }
-                }
-              }}
-              sx={{ minWidth: 200, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.15)' }, '& .MuiInputBase-input': { color: '#e5e7eb' } }}
-            >
-              <MenuItem value="All">All Types</MenuItem>
-              <MenuItem value="reviewer">Reviewer</MenuItem>
-              <MenuItem value="pretest">Pre-test</MenuItem>
-              <MenuItem value="posttest">Post-test</MenuItem>
-            </TextField>
           </Stack>
         </Toolbar>
 
         {/* Classwork Table */}
-        <div className="admin-table-container">
-          <Table stickyHeader size="medium" aria-label="classwork table" className="admin-table">
+        <Paper elevation={1} sx={{ borderRadius: 2, overflow: 'hidden', mb: 3 }}>
+          <Table stickyHeader size="medium" aria-label="classwork table" sx={{ '& .MuiTableHead-root': { bgcolor: 'grey.100' }, '& .MuiTableCell-head': { color: 'text.secondary', fontWeight: 600 } }}>
             <TableHead>
               <TableRow>
-                <TableCell className="admin-table-header">Test Level</TableCell>
-                <TableCell className="admin-table-header">Title & Description</TableCell>
-                <TableCell className="admin-table-header">Questionnaires</TableCell>
-                <TableCell className="admin-table-header">Questions</TableCell>
-                <TableCell className="admin-table-header">Created</TableCell>
-                <TableCell align="right" className="admin-table-header actions">Actions</TableCell>
+                <TableCell>Test Level</TableCell>
+                <TableCell>Title & Description</TableCell>
+                <TableCell>Questionnaires</TableCell>
+                <TableCell>Questions</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Created</TableCell>
+                <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredClassworks.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} style={{ opacity: 0.8, textAlign: 'center', py: 4 }}>
+                  <TableCell colSpan={7} style={{ opacity: 0.8, textAlign: 'center', py: 4 }}>
                     {classworks.length === 0 ? (
                       <Box>
                         <QuizIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
@@ -564,7 +640,7 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
               {filteredClassworks.map((classwork) => (
                 <TableRow key={classwork.classwork_id} hover>
                   <TableCell>
-                    <Chip 
+                    <Chip
                       label={getTestLevelLabel(classwork.test_level)}
                       color={getTestLevelColor(classwork.test_level)}
                       size="small"
@@ -585,12 +661,12 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
                       {classwork.questionnaires && classwork.questionnaires.length > 0 ? (
                         <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
                           {classwork.questionnaires.map((q) => (
-                            <Chip 
+                            <Chip
                               key={q.qn_id}
                               label={`${q.subject?.subject_name}: ${q.title}`}
                               size="small"
                               variant="outlined"
-                              sx={{ fontSize: '0.75rem', color:'white' }}
+                              sx={{ fontSize: '0.75rem', color: 'white' }}
                             />
                           ))}
                         </Stack>
@@ -603,24 +679,36 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
                   </TableCell>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Chip 
+                      <Chip
                         label={classwork.questionnaires?.reduce((total, q) => total + (q.questions?.length || 0), 0) || 0}
                         size="small"
                         color="primary"
                         variant="outlined"
                       />
-                      <Typography variant="body2" color="textSecondary">
+                      <Typography variant="body2" color="white">
                         questions
                       </Typography>
                     </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      sx={{ color: 'white' }}
+                      label={classwork.posting_status || 'draft'}
+                      size="small"
+                      color={
+                        classwork.posting_status === 'posted' ? 'success' :
+                          classwork.posting_status === 'archived' ? 'warning' : 'default'
+                      }
+                      variant={classwork.posting_status === 'posted' ? 'filled' : 'outlined'}
+                    />
                   </TableCell>
                   <TableCell>
                     {new Date(classwork.created_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell align="right" className="actions">
                     <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         sx={{ color: '#93c5fd' }}
                         onClick={() => handleViewDetails(classwork)}
                         title="View Details"
@@ -634,13 +722,56 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
                       >
                         <PostAddIcon />
                       </IconButton>
+
+                      {/* Post/Archive Button Logic */}
+                      {(() => {
+                        const hasQuestions = classwork.questionnaires?.some(q => q.questions?.length > 0);
+                        const isPosted = classwork.posting_status === 'posted';
+
+                        if (hasQuestions && !isPosted) {
+                          // Show Post button if has questions and not posted
+                          return (
+                            <IconButton
+                              color="success"
+                              onClick={() => handlePostClasswork(classwork)}
+                              title="Post to Learners"
+                            >
+                              <PublishIcon />
+                            </IconButton>
+                          );
+                        } else if (isPosted) {
+                          // Show Archive button if already posted
+                          return (
+                            <IconButton
+                              color="warning"
+                              onClick={() => handleArchiveClasswork(classwork)}
+                              title="Archive Classwork"
+                            >
+                              <ArchiveIcon />
+                            </IconButton>
+                          );
+                        }
+                        return null;
+                      })()}
                     </Stack>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
-        </div>
+        </Paper>
+
+        {/* Global Snackbar for success/error */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
 
         {/* View Details Modal */}
         <Dialog open={viewDetailsOpen} onClose={() => setViewDetailsOpen(false)} maxWidth="md" fullWidth>
@@ -653,39 +784,79 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
           <DialogContent>
             {selectedClasswork && (
               <Box>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      <strong>Test Level:</strong> {getTestLevelLabel(selectedClasswork.test_level)}
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      <strong>Created:</strong> {new Date(selectedClasswork.created_at).toLocaleDateString()}
-                    </Typography>
-                  </Grid>
-                </Grid>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Typography variant="subtitle1" gutterBottom>
+                    <strong>Test Level:</strong> {getTestLevelLabel(selectedClasswork.test_level)}
+                  </Typography>
+                  <Typography variant="subtitle1" gutterBottom>
+                    <strong>Created:</strong> {new Date(selectedClasswork.created_at).toLocaleDateString()}
+                  </Typography>
+                </Box>
 
                 <Divider sx={{ my: 2 }} />
 
                 <Typography variant="h6" gutterBottom>
                   Questionnaires ({selectedClasswork.questionnaires?.length || 0})
                 </Typography>
-                
+
                 {selectedClasswork.questionnaires && selectedClasswork.questionnaires.length > 0 ? (
-                  <List>
-                    {selectedClasswork.questionnaires.map((questionnaire) => (
-                      <ListItem key={questionnaire.qn_id}>
-                        <ListItemAvatar>
+                  selectedClasswork.questionnaires.map((questionnaire) => (
+                    <Card key={questionnaire.qn_id} sx={{ mb: 2, border: '1px solid #e0e0e0' }}>
+                      <CardContent>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                           <AssignmentIcon color="success" />
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={questionnaire.title}
-                          secondary={`Subject: ${questionnaire.subject?.subject_name} • Duration: ${questionnaire.time_duration} minutes`}
-                        />
-                      </ListItem>
-                    ))}
-                  </List>
+                          <Box>
+                            <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                              {questionnaire.title}
+                            </Typography>
+                            <Typography variant="body2" color="textSecondary">
+                              Subject: {questionnaire.subject?.subject_name} • Duration: {questionnaire.time_duration} minutes
+                            </Typography>
+                          </Box>
+                        </Box>
+
+                        {questionnaire.questions && questionnaire.questions.length > 0 ? (
+                          <Box>
+                            <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 600 }}>
+                              Questions ({questionnaire.questions.length})
+                            </Typography>
+                            <List dense>
+                              {questionnaire.questions.map((question, qIndex) => (
+                                <ListItem key={question.question_id} sx={{ pl: 0, mb: 2 }}>
+                                  <ListItemText
+                                    primary={`${qIndex + 1}. ${question.question_text}`}
+                                    secondary={
+                                      <Box sx={{ mt: 1 }}>
+                                        <Typography variant="caption" display="block">
+                                          A) {question.option_a}
+                                        </Typography>
+                                        <Typography variant="caption" display="block">
+                                          B) {question.option_b}
+                                        </Typography>
+                                        <Typography variant="caption" display="block">
+                                          C) {question.option_c}
+                                        </Typography>
+                                        <Typography variant="caption" display="block">
+                                          D) {question.option_d}
+                                        </Typography>
+                                        <Typography variant="caption" display="block" sx={{ color: 'green', fontWeight: 'bold' }}>
+                                          Correct Answer: {question.ans_key || question.correct_answer}
+                                        </Typography>
+                                      </Box>
+                                    }
+                                  />
+                                </ListItem>
+                              ))}
+                            </List>
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" color="textSecondary" sx={{ fontStyle: 'italic' }}>
+                            No questions added yet for this questionnaire.
+                          </Typography>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))
                 ) : (
                   <Typography color="textSecondary">
                     No questionnaires created yet for this classwork.
@@ -700,14 +871,14 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
         </Dialog>
 
         {/* Add Subject Modal */}
-        <AddSubjectModal 
-          open={addSubjectOpen} 
-          onClose={() => setAddSubjectOpen(false)} 
+        <AddSubjectModal
+          open={addSubjectOpen}
+          onClose={() => setAddSubjectOpen(false)}
         />
 
         {/* Add Questions Modal */}
-        <Dialog 
-          open={addQuestionsOpen} 
+        <Dialog
+          open={addQuestionsOpen}
           onClose={resetQuestionsModal}
           maxWidth="md"
           fullWidth
@@ -718,26 +889,26 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
             }
           }}
         >
-          <DialogTitle sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
+          <DialogTitle sx={{
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
             pb: 2,
             fontSize: '1.25rem',
             fontWeight: 600
           }}>
-            {selectedClassworkForQuestions && 
+            {selectedClassworkForQuestions &&
               `${getTestLevelLabel(selectedClassworkForQuestions.test_level)} Questions`
             }
             <IconButton onClick={resetQuestionsModal} size="small">
               <CloseIcon />
             </IconButton>
           </DialogTitle>
-          
+
           <DialogContent sx={{ px: 3, py: 0 }}>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               {questionsData.map((question, index) => (
-                <Box key={question.id} sx={{ 
+                <Box key={question.id} sx={{
                   border: '1px solid #e5e7eb',
                   borderRadius: '8px',
                   p: 2,
@@ -760,7 +931,7 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
                       }
                     }}
                   />
-                  
+
                   {/* Options Grid */}
                   <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.5, mb: 2 }}>
                     <TextField
@@ -812,7 +983,7 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
                       <MenuItem value="D">D</MenuItem>
                     </TextField>
                   </Box>
-                  
+
                   {/* Second row of options */}
                   <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1.5 }}>
                     <TextField
@@ -849,11 +1020,11 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
               ))}
             </Box>
           </DialogContent>
-          
+
           <DialogActions sx={{ p: 3, gap: 1 }}>
-            <Button 
+            <Button
               onClick={resetQuestionsModal}
-              sx={{ 
+              sx={{
                 color: '#6b7280',
                 textTransform: 'none',
                 fontWeight: 500,
@@ -867,10 +1038,10 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
             >
               Reset
             </Button>
-            <Button 
+            <Button
               onClick={handleSaveNewQuestions}
               variant="contained"
-              sx={{ 
+              sx={{
                 backgroundColor: '#3b82f6',
                 textTransform: 'none',
                 fontWeight: 500,
@@ -887,158 +1058,16 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
           </DialogActions>
         </Dialog>
 
-        {/* Create Classwork Modal */}
-        <Dialog 
-          open={createClassworkOpen} 
+        {/* Create Classwork Modal (external) */}
+        <AddReviewerModal
+          open={createClassworkOpen}
           onClose={() => setCreateClassworkOpen(false)}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>
-            <Box display="flex" alignItems="center" gap={2}>
-              <QuizIcon color="primary" />
-              <Typography variant="h6">Create Classwork</Typography>
-            </Box>
-          </DialogTitle>
-          <DialogContent sx={{ pt: 3 }}>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {/* Test Level */}
-              <Box>
-                <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#666' }}>
-                  Test Level
-                </Typography>
-                <FormControl fullWidth size="small">
-                  <Select
-                    value={newClasswork.test_level}
-                    onChange={(e) => setNewClasswork({ ...newClasswork, test_level: e.target.value })}
-                    sx={{ backgroundColor: '#f5f5f5', borderRadius: 2 }}
-                  >
-                    <MenuItem value="reviewer">Reviewer</MenuItem>
-                    <MenuItem value="pretest">Pre-test</MenuItem>
-                    <MenuItem value="posttest">Post-test</MenuItem>
-                  </Select>
-                </FormControl>
-              </Box>
-
-              {/* Row 1: Subject and Time Duration */}
-              <Box display="flex" gap={2}>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#666' }}>
-                    Subject
-                  </Typography>
-                  <FormControl fullWidth size="small">
-                    <Select
-                      value={newClasswork.subject_id}
-                      onChange={(e) => setNewClasswork({ ...newClasswork, subject_id: e.target.value })}
-                      sx={{ backgroundColor: '#f5f5f5', borderRadius: 2 }}
-                    >
-                      {subjects?.map((subject) => (
-                        <MenuItem key={subject.subject_id} value={subject.subject_id}>
-                          {subject.subject_name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#666' }}>
-                    Time Duration
-                  </Typography>
-                  <TextField
-                    type="number"
-                    value={newClasswork.time_duration}
-                    onChange={(e) => setNewClasswork({ ...newClasswork, time_duration: parseInt(e.target.value) })}
-                    size="small"
-                    fullWidth
-                    helperText="hh:mm"
-                    sx={{ 
-                      '& .MuiInputBase-root': { 
-                        backgroundColor: '#f5f5f5', 
-                        borderRadius: 2 
-                      }
-                    }}
-                  />
-                </Box>
-              </Box>
-
-              {/* Questionnaire Title */}
-              <Box>
-                <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#666' }}>
-                  Questionnaire Title
-                </Typography>
-                <TextField
-                  value={newClasswork.title}
-                  onChange={(e) => setNewClasswork({ ...newClasswork, title: e.target.value })}
-                  size="small"
-                  fullWidth
-                  sx={{ 
-                    '& .MuiInputBase-root': { 
-                      backgroundColor: '#f5f5f5', 
-                      borderRadius: 2 
-                    }
-                  }}
-                />
-              </Box>
-
-              {/* Description */}
-              <Box>
-                <Typography variant="body2" sx={{ mb: 1, fontWeight: 500, color: '#666' }}>
-                  text field for Description
-                </Typography>
-                <TextField
-                  value={newClasswork.description}
-                  onChange={(e) => setNewClasswork({ ...newClasswork, description: e.target.value })}
-                  multiline
-                  rows={3}
-                  size="small"
-                  fullWidth
-                  sx={{ 
-                    '& .MuiInputBase-root': { 
-                      backgroundColor: '#f5f5f5', 
-                      borderRadius: 2 
-                    }
-                  }}
-                />
-              </Box>
-            </Box>
-          </DialogContent>
-          <DialogActions sx={{ p: 3, gap: 1 }}>
-            <Button
-              onClick={() => {
-                setNewClasswork({ 
-                  test_level: 'reviewer',
-                  subject_id: '',
-                  time_duration: 30,
-                  title: '',
-                  description: ''
-                });
-                setCreateClassworkOpen(false);
-              }}
-              sx={{ 
-                backgroundColor: '#e5e7eb',
-                color: '#374151',
-                '&:hover': { backgroundColor: '#d1d5db' }
-              }}
-            >
-              Reset
-            </Button>
-            <Button
-              variant="contained"
-              onClick={handleCreateClasswork}
-              disabled={!newClasswork.test_level || !newClasswork.subject_id || !newClasswork.title}
-              sx={{ 
-                backgroundColor: '#3b82f6',
-                '&:hover': { backgroundColor: '#2563eb' }
-              }}
-            >
-              Save
-            </Button>
-          </DialogActions>
-        </Dialog>
+          subjects={subjects}
+        />
 
         {/* Questionnaire Creation Modal */}
-        <Dialog 
-          open={questionnaireModalOpen} 
+        <Dialog
+          open={questionnaireModalOpen}
           onClose={handleResetQuestionnaire}
           maxWidth={currentStep === 1 ? "md" : "lg"}
           fullWidth
@@ -1054,8 +1083,8 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
           <DialogContent sx={{ minHeight: 400 }}>
             <Box display="flex" sx={{ gap: 3, mt: 2 }}>
               {/* Left Side - Questionnaire Setup */}
-              <Box sx={{ 
-                width: currentStep === 1 ? '100%' : '45%', 
+              <Box sx={{
+                width: currentStep === 1 ? '100%' : '45%',
                 transition: 'all 0.3s ease-in-out'
               }}>
                 <Box display="flex" alignItems="center" gap={2} mb={2}>
@@ -1100,10 +1129,10 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
                         fullWidth
                         disabled={currentStep === 2}
                         helperText="hh:mm"
-                        sx={{ 
-                          '& .MuiInputBase-root': { 
-                            backgroundColor: '#f5f5f5', 
-                            borderRadius: 2 
+                        sx={{
+                          '& .MuiInputBase-root': {
+                            backgroundColor: '#f5f5f5',
+                            borderRadius: 2
                           }
                         }}
                       />
@@ -1121,10 +1150,10 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
                       size="small"
                       fullWidth
                       disabled={currentStep === 2}
-                      sx={{ 
-                        '& .MuiInputBase-root': { 
-                          backgroundColor: '#f5f5f5', 
-                          borderRadius: 2 
+                      sx={{
+                        '& .MuiInputBase-root': {
+                          backgroundColor: '#f5f5f5',
+                          borderRadius: 2
                         }
                       }}
                     />
@@ -1143,10 +1172,10 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
                       size="small"
                       fullWidth
                       disabled={currentStep === 2}
-                      sx={{ 
-                        '& .MuiInputBase-root': { 
-                          backgroundColor: '#f5f5f5', 
-                          borderRadius: 2 
+                      sx={{
+                        '& .MuiInputBase-root': {
+                          backgroundColor: '#f5f5f5',
+                          borderRadius: 2
                         }
                       }}
                     />
@@ -1167,7 +1196,7 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
 
               {/* Right Side - Question Form (only visible in step 2) */}
               {currentStep === 2 && (
-                <Box sx={{ 
+                <Box sx={{
                   width: '55%',
                   pl: 3,
                   borderLeft: '1px solid #e0e0e0',
@@ -1190,44 +1219,36 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
                       size="small"
                     />
 
-                    <Grid container spacing={2}>
-                      <Grid item xs={6}>
-                        <TextField
-                          label="Option A"
-                          value={currentQuestion.option_a}
-                          onChange={(e) => setCurrentQuestion({ ...currentQuestion, option_a: e.target.value })}
-                          fullWidth
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          label="Option B"
-                          value={currentQuestion.option_b}
-                          onChange={(e) => setCurrentQuestion({ ...currentQuestion, option_b: e.target.value })}
-                          fullWidth
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          label="Option C"
-                          value={currentQuestion.option_c}
-                          onChange={(e) => setCurrentQuestion({ ...currentQuestion, option_c: e.target.value })}
-                          fullWidth
-                          size="small"
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          label="Option D"
-                          value={currentQuestion.option_d}
-                          onChange={(e) => setCurrentQuestion({ ...currentQuestion, option_d: e.target.value })}
-                          fullWidth
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                      <TextField
+                        label="Option A"
+                        value={currentQuestion.option_a}
+                        onChange={(e) => setCurrentQuestion({ ...currentQuestion, option_a: e.target.value })}
+                        fullWidth
+                        size="small"
+                      />
+                      <TextField
+                        label="Option B"
+                        value={currentQuestion.option_b}
+                        onChange={(e) => setCurrentQuestion({ ...currentQuestion, option_b: e.target.value })}
+                        fullWidth
+                        size="small"
+                      />
+                      <TextField
+                        label="Option C"
+                        value={currentQuestion.option_c}
+                        onChange={(e) => setCurrentQuestion({ ...currentQuestion, option_c: e.target.value })}
+                        fullWidth
+                        size="small"
+                      />
+                      <TextField
+                        label="Option D"
+                        value={currentQuestion.option_d}
+                        onChange={(e) => setCurrentQuestion({ ...currentQuestion, option_d: e.target.value })}
+                        fullWidth
+                        size="small"
+                      />
+                    </Box>
 
                     <FormControl size="small" sx={{ minWidth: 200 }}>
                       <InputLabel>Correct Answer</InputLabel>
@@ -1265,8 +1286,8 @@ export default function CaiClasswork({ auth, cai, classworks, subjects }) {
                               primary={`${index + 1}. ${q.question_text}`}
                               secondary={`Correct: ${q.correct_answer}`}
                             />
-                            <IconButton 
-                              size="small" 
+                            <IconButton
+                              size="small"
                               onClick={() => handleRemoveQuestion(q.id)}
                               color="error"
                             >

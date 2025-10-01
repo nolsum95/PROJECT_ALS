@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Head, router } from '@inertiajs/react';
+import LearnerLayout from '@/Layouts/LearnerLayout';
 import {
   Box,
   Container,
@@ -32,84 +33,62 @@ import {
   Send as SubmitIcon
 } from '@mui/icons-material';
 
-export default function TakeExam({ 
-  auth, 
-  exam = {}, 
+export default function TakeExam({
+  auth,
+  learner = {},
+  questionnaire = {},
   questions = [],
-  timeLimit = 90,
+  existingAttempt = null,
   flash = {}
 }) {
-  const [currentQuestion, setCurrentQuestion] = useState(0);
+  // Pagination by sets of 10 questions
+  const PAGE_SIZE = 10;
+  const [currentSet, setCurrentSet] = useState(0); // zero-based set index
   const [answers, setAnswers] = useState({});
-  const [timeRemaining, setTimeRemaining] = useState(timeLimit * 60); // Convert to seconds
+  const [timeRemaining, setTimeRemaining] = useState(null);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [examStarted, setExamStarted] = useState(false);
+  const [sessionKey, setSessionKey] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const [showResultDialog, setShowResultDialog] = useState(false);
 
-  // Mock exam data
-  const mockExam = {
-    id: exam.id || 1,
-    title: exam.title || 'Mathematics Pretest',
-    subject: exam.subject || 'Mathematics',
-    type: exam.type || 'pretest',
-    description: exam.description || 'Assessment of basic mathematical skills',
-    passing_score: exam.passing_score || 75,
-    ...exam
-  };
+  const title = questionnaire?.title || 'Exam';
+  const subjectName = questionnaire?.subject?.subject_name || 'General';
+  const timeLimit = questionnaire?.time_duration || 30; // minutes
 
-  const mockQuestions = questions.length > 0 ? questions : [
-    {
-      id: 1,
-      question_text: "What is 15 + 27?",
-      option_a: "40",
-      option_b: "42",
-      option_c: "44",
-      option_d: "46",
-      ans_key: "B"
-    },
-    {
-      id: 2,
-      question_text: "If x + 5 = 12, what is the value of x?",
-      option_a: "5",
-      option_b: "6",
-      option_c: "7",
-      option_d: "8",
-      ans_key: "C"
-    },
-    {
-      id: 3,
-      question_text: "What is 8 × 9?",
-      option_a: "71",
-      option_b: "72",
-      option_c: "73",
-      option_d: "74",
-      ans_key: "B"
-    },
-    {
-      id: 4,
-      question_text: "What is 144 ÷ 12?",
-      option_a: "11",
-      option_b: "12",
-      option_c: "13",
-      option_d: "14",
-      ans_key: "B"
-    },
-    {
-      id: 5,
-      question_text: "What is 25% of 80?",
-      option_a: "15",
-      option_b: "20",
-      option_c: "25",
-      option_d: "30",
-      ans_key: "B"
-    }
-  ];
-
-  // Timer effect
+  // Initialize session and timer similar to TakeReviewer
   useEffect(() => {
-    if (!examStarted) return;
+    if (!learner?.learner_id || !questionnaire?.qn_id) return;
+    const key = `exam_${questionnaire.qn_id}_${learner.learner_id}`;
+    setSessionKey(key);
+  }, [learner?.learner_id, questionnaire?.qn_id]);
 
-    const timer = setInterval(() => {
+  useEffect(() => {
+    if (!sessionKey) return;
+    const total = (timeLimit || 30) * 60;
+    const saved = localStorage.getItem(sessionKey);
+    if (saved) {
+      try {
+        const s = JSON.parse(saved);
+        const remaining = s.timeRemaining ?? Math.max(0, s.totalTime - Math.floor((Date.now() - s.startTime) / 1000));
+        setTimeRemaining(remaining > 0 ? remaining : 0);
+      } catch {
+        setTimeRemaining(total);
+        localStorage.setItem(sessionKey, JSON.stringify({ startTime: Date.now(), totalTime: total, timeRemaining: total, answers: {}, currentQuestion: 0 }));
+      }
+    } else {
+      setTimeRemaining(total);
+      localStorage.setItem(sessionKey, JSON.stringify({ startTime: Date.now(), totalTime: total, timeRemaining: total, answers: {}, currentQuestion: 0 }));
+    }
+    // Auto-start exam once timer is initialized
+    setExamStarted(true);
+  }, [sessionKey, timeLimit]);
+
+  useEffect(() => {
+    if (!examStarted || timeRemaining == null) return;
+    const t = setInterval(() => {
       setTimeRemaining(prev => {
         if (prev <= 1) {
           handleAutoSubmit();
@@ -118,9 +97,8 @@ export default function TakeExam({
         return prev - 1;
       });
     }, 1000);
-
-    return () => clearInterval(timer);
-  }, [examStarted]);
+    return () => clearInterval(t);
+  }, [examStarted, timeRemaining]);
 
   // Prevent page refresh/back button
   useEffect(() => {
@@ -177,33 +155,51 @@ export default function TakeExam({
     setExamStarted(true);
   };
 
-  const handleNextQuestion = () => {
-    if (currentQuestion < mockQuestions.length - 1) {
-      setCurrentQuestion(prev => prev + 1);
+  // Scroll to top on set change so the next set starts at the top
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentSet]);
+
+  // When redirected back after submission, if exam_result is present in flash, show results popup
+  useEffect(() => {
+    if (flash?.exam_result) {
+      setShowResultDialog(true);
+    }
+  }, [flash?.exam_result]);
+
+  const totalSets = Math.ceil((questions?.length || 0) / PAGE_SIZE);
+
+  const handleNextSet = () => {
+    if (currentSet < totalSets - 1) {
+      setCurrentSet(prev => prev + 1);
     }
   };
 
-  const handlePrevQuestion = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(prev => prev - 1);
+  const handlePrevSet = () => {
+    if (currentSet > 0) {
+      setCurrentSet(prev => prev - 1);
     }
   };
 
   const handleSubmitExam = () => {
+    setSubmitError(null);
+    setSubmitting(true);
     const formData = {
-      exam_id: mockExam.id,
+      questionnaire_id: questionnaire.qn_id,
       answers: answers,
-      time_taken: (timeLimit * 60) - timeRemaining,
-      completed_at: new Date().toISOString()
+      time_taken: Math.max(0, (timeLimit * 60) - (timeRemaining || 0))
     };
-
     router.post(route('learner.exams.submit'), formData, {
       onSuccess: () => {
-        // Redirect to results page
+        if (sessionKey) localStorage.removeItem(sessionKey);
       },
       onError: (errors) => {
         console.error('Submission failed:', errors);
-      }
+        // Pull first error message if available
+        const first = errors?.error || Object.values(errors || {})[0];
+        setSubmitError(first || 'Submission failed. Please try again.');
+      },
+      onFinish: () => setSubmitting(false)
     });
   };
 
@@ -212,321 +208,275 @@ export default function TakeExam({
     handleSubmitExam();
   };
 
-  const getAnsweredCount = () => {
-    return Object.keys(answers).length;
-  };
+  const getAnsweredCount = () => Object.keys(answers).length;
 
   const getProgressPercentage = () => {
-    return Math.round((getAnsweredCount() / mockQuestions.length) * 100);
+    return questions.length > 0 ? Math.round((getAnsweredCount() / questions.length) * 100) : 0;
   };
 
-  if (!examStarted) {
+  // If already completed, show done screen with Home button (no answers/results)
+  if (existingAttempt && existingAttempt.status === 'completed') {
     return (
-      <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50', py: 4 }}>
-        <Head title={`Take Exam: ${mockExam.title}`} />
-        
-        <Container maxWidth="md">
-          <Card sx={{ textAlign: 'center', p: 4 }}>
-            <AssignmentIcon sx={{ fontSize: 80, color: 'primary.main', mb: 2 }} />
-            
-            <Typography variant="h4" sx={{ fontWeight: 600, mb: 2 }}>
-              {mockExam.title}
+      <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50', py: 8 }}>
+        <Head title={`Exam Completed - ${title}`} />
+        <Container maxWidth="sm">
+          <Card sx={{ textAlign: 'center', p: 6 }}>
+            <CheckCircleIcon sx={{ fontSize: 80, color: 'success.main', mb: 2 }} />
+            <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>Exam Completed</Typography>
+            <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+              You have completed this exam. You can return to your dashboard.
             </Typography>
-            
-            <Typography variant="h6" color="text.secondary" sx={{ mb: 4 }}>
-              {mockExam.subject} • {mockExam.type.toUpperCase()}
-            </Typography>
-            
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12} sm={4}>
-                <Paper sx={{ p: 2 }}>
-                  <Typography variant="h6">{mockQuestions.length}</Typography>
-                  <Typography variant="body2" color="text.secondary">Questions</Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <Paper sx={{ p: 2 }}>
-                  <Typography variant="h6">{timeLimit} mins</Typography>
-                  <Typography variant="body2" color="text.secondary">Time Limit</Typography>
-                </Paper>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <Paper sx={{ p: 2 }}>
-                  <Typography variant="h6">{mockExam.passing_score}%</Typography>
-                  <Typography variant="body2" color="text.secondary">Passing Score</Typography>
-                </Paper>
-              </Grid>
-            </Grid>
-            
-            <Alert severity="warning" sx={{ mb: 4, textAlign: 'left' }}>
-              <Typography variant="body2">
-                <strong>Important Instructions:</strong>
-              </Typography>
-              <ul style={{ marginTop: 8, paddingLeft: 20 }}>
-                <li>Once started, you cannot pause or restart the exam</li>
-                <li>Make sure you have a stable internet connection</li>
-                <li>Do not refresh the page or navigate away</li>
-                <li>Your progress will be automatically saved</li>
-                <li>The exam will auto-submit when time runs out</li>
-              </ul>
-            </Alert>
-            
-            <Button
-              variant="contained"
-              size="large"
-              startIcon={<AssignmentIcon />}
-              onClick={handleStartExam}
-              sx={{ px: 4, py: 2, fontSize: '1.1rem' }}
-            >
-              Start Exam
-            </Button>
+            <Button variant="contained" onClick={() => router.visit(route('learner.exams'))}>Go to Exams</Button>
           </Card>
         </Container>
       </Box>
     );
   }
 
-  const currentQ = mockQuestions[currentQuestion];
+  // Remove pre-start screen; exam starts immediately (like TakeReviewer)
+
+  const startIndex = currentSet * PAGE_SIZE;
+  const endIndex = Math.min(startIndex + PAGE_SIZE, questions.length);
+  const currentQuestions = questions.slice(startIndex, endIndex);
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'grey.50' }}>
-      <Head title={`Taking: ${mockExam.title}`} />
-      
-      {/* Header */}
-      <Paper sx={{ p: 2, mb: 2, position: 'sticky', top: 0, zIndex: 1000 }}>
-        <Container maxWidth="lg">
-          <Grid container alignItems="center" spacing={2}>
-            <Grid item xs={12} sm={4}>
+    <LearnerLayout auth={auth} selectedSection="exams" title={`Take Exam - ${title}`}>
+      <Head title={`Taking: ${title}`} />
+
+      {flash?.success && (
+        <Alert severity="success" sx={{ mb: 2 }}>{flash.success}</Alert>
+      )}
+      {flash?.error && (
+        <Alert severity="error" sx={{ mb: 2 }}>{flash.error}</Alert>
+      )}
+
+      {/* Header (match TakeReviewer) */}
+      <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+        <Paper elevation={1} sx={{ p: 3, mb: 3, bgcolor: 'primary.main', color: 'white' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box>
+              <Typography variant="h4" sx={{ fontWeight: 600, mb: 1 }}>
+                {title}
+              </Typography>
+              <Typography variant="body1" sx={{ opacity: 0.9 }}>
+                {subjectName}
+              </Typography>
+            </Box>
+            <Box sx={{ textAlign: 'center' }}>
+              <TimerIcon sx={{ fontSize: 32, mb: 1 }} />
               <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                {mockExam.title}
+                {formatTime(timeRemaining || 0)}
               </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Question {currentQuestion + 1} of {mockQuestions.length}
+              <Typography variant="caption">Time Remaining</Typography>
+            </Box>
+          </Box>
+        </Paper>
+
+        {/* Progress */}
+        <Card sx={{ mb: 3 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+              <Typography variant="h6">
+                Questions {questions.length ? `${startIndex + 1}-${endIndex}` : '0-0'} of {questions.length}
               </Typography>
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                  Progress: {getAnsweredCount()}/{mockQuestions.length} answered
-                </Typography>
-                <LinearProgress
-                  variant="determinate"
-                  value={getProgressPercentage()}
-                  sx={{ height: 8, borderRadius: 4 }}
-                />
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <Box sx={{ textAlign: 'right' }}>
-                <Chip
-                  icon={<TimerIcon />}
-                  label={formatTime(timeRemaining)}
-                  color={getTimeColor()}
-                  sx={{ fontSize: '1rem', p: 1 }}
-                />
-              </Box>
-            </Grid>
-          </Grid>
-        </Container>
-      </Paper>
+              <Chip 
+                label={`${Math.round(getProgressPercentage())}% Complete`}
+                color="primary"
+                variant="outlined"
+              />
+            </Box>
+            <LinearProgress 
+              variant="determinate" 
+              value={getProgressPercentage()} 
+              sx={{ height: 8, borderRadius: 4 }}
+            />
+          </CardContent>
+        </Card>
 
-      <Container maxWidth="lg">
-        <Grid container spacing={3}>
-          {/* Question */}
-          <Grid item xs={12} md={8}>
-            <Card sx={{ mb: 3 }}>
-              <CardContent sx={{ p: 4 }}>
-                <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                  Question {currentQuestion + 1}
+        {/* Question Set (10 per page) */}
+        {currentQuestions.map((q, idx) => (
+          <Card key={q.question_id} sx={{ mb: 3 }}>
+            <CardContent sx={{ p: 4 }}>
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 3 }}>
+                <AssignmentIcon sx={{ color: 'primary.main', mr: 2, mt: 0.5 }} />
+                <Typography variant="h6" sx={{ fontWeight: 500, lineHeight: 1.4 }}>
+                  {(startIndex + idx + 1)}. {q.question_text}
                 </Typography>
-                
-                <Typography variant="h5" sx={{ mb: 4, lineHeight: 1.6 }}>
-                  {currentQ.question_text}
-                </Typography>
-                
-                <FormControl component="fieldset" fullWidth>
-                  <RadioGroup
-                    value={answers[currentQ.id] || ''}
-                    onChange={(e) => handleAnswerChange(currentQ.id, e.target.value)}
-                  >
-                    <FormControlLabel
-                      value="A"
-                      control={<Radio />}
-                      label={
-                        <Typography variant="body1" sx={{ fontSize: '1.1rem' }}>
-                          A. {currentQ.option_a}
-                        </Typography>
-                      }
-                      sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 2, mr: 0 }}
-                    />
-                    <FormControlLabel
-                      value="B"
-                      control={<Radio />}
-                      label={
-                        <Typography variant="body1" sx={{ fontSize: '1.1rem' }}>
-                          B. {currentQ.option_b}
-                        </Typography>
-                      }
-                      sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 2, mr: 0 }}
-                    />
-                    <FormControlLabel
-                      value="C"
-                      control={<Radio />}
-                      label={
-                        <Typography variant="body1" sx={{ fontSize: '1.1rem' }}>
-                          C. {currentQ.option_c}
-                        </Typography>
-                      }
-                      sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 2, mr: 0 }}
-                    />
-                    <FormControlLabel
-                      value="D"
-                      control={<Radio />}
-                      label={
-                        <Typography variant="body1" sx={{ fontSize: '1.1rem' }}>
-                          D. {currentQ.option_d}
-                        </Typography>
-                      }
-                      sx={{ mb: 2, p: 2, border: '1px solid #e0e0e0', borderRadius: 2, mr: 0 }}
-                    />
-                  </RadioGroup>
-                </FormControl>
-              </CardContent>
-            </Card>
+              </Box>
 
-            {/* Navigation */}
+              <Divider sx={{ mb: 3 }} />
+
+              <RadioGroup
+                value={answers[q.question_id] || ''}
+                onChange={(e) => handleAnswerChange(q.question_id, e.target.value)}
+              >
+                {['A', 'B', 'C', 'D'].map((option) => {
+                  const optionText = q[`option_${option.toLowerCase()}`];
+                  if (!optionText) return null;
+                  return (
+                    <FormControlLabel
+                      key={option}
+                      value={option}
+                      control={<Radio />}
+                      label={
+                        <Box sx={{ py: 1 }}>
+                          <Typography variant="body1">
+                            <strong>{option}.</strong> {optionText}
+                          </Typography>
+                        </Box>
+                      }
+                      sx={{
+                        mb: 1,
+                        p: 2,
+                        border: '1px solid',
+                        borderColor: answers[q.question_id] === option ? 'primary.main' : 'divider',
+                        borderRadius: 2,
+                        bgcolor: answers[q.question_id] === option ? 'primary.light' : 'transparent',
+                        '&:hover': { bgcolor: 'action.hover' }
+                      }}
+                    />
+                  );
+                })}
+              </RadioGroup>
+            </CardContent>
+          </Card>
+        ))}
+
+        {/* Set Navigation */}
+        <Card>
+          <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Button
                 variant="outlined"
-                startIcon={<PrevIcon />}
-                onClick={handlePrevQuestion}
-                disabled={currentQuestion === 0}
+                onClick={handlePrevSet}
+                disabled={currentSet === 0}
               >
-                Previous
+                Previous 10
               </Button>
-              
+
               <Typography variant="body2" color="text.secondary">
-                {currentQuestion + 1} / {mockQuestions.length}
+                {getAnsweredCount()} of {questions.length} answered
               </Typography>
-              
-              {currentQuestion === mockQuestions.length - 1 ? (
+
+              {currentSet === totalSets - 1 ? (
                 <Button
                   variant="contained"
-                  startIcon={<SubmitIcon />}
-                  onClick={() => setShowSubmitDialog(true)}
                   color="success"
+                  onClick={() => setShowSubmitDialog(true)}
+                  disabled={Object.keys(answers).length === 0}
+                  sx={{ minWidth: 120 }}
                 >
                   Submit Exam
                 </Button>
               ) : (
-                <Button
-                  variant="contained"
-                  endIcon={<NextIcon />}
-                  onClick={handleNextQuestion}
-                >
-                  Next
-                </Button>
+                <Button variant="contained" onClick={handleNextSet}>Next 10</Button>
               )}
             </Box>
-          </Grid>
-
-          {/* Question Navigator */}
-          <Grid item xs={12} md={4}>
-            <Card sx={{ position: 'sticky', top: 120 }}>
-              <CardContent>
-                <Typography variant="h6" sx={{ mb: 2 }}>
-                  Question Navigator
-                </Typography>
-                
-                <Grid container spacing={1}>
-                  {mockQuestions.map((_, index) => (
-                    <Grid item xs={3} key={index}>
-                      <Button
-                        variant={currentQuestion === index ? 'contained' : 'outlined'}
-                        color={answers[mockQuestions[index].id] ? 'success' : 'primary'}
-                        onClick={() => setCurrentQuestion(index)}
-                        sx={{ width: '100%', minWidth: 0 }}
-                      >
-                        {index + 1}
-                      </Button>
-                    </Grid>
-                  ))}
-                </Grid>
-                
-                <Divider sx={{ my: 2 }} />
-                
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Box sx={{ width: 16, height: 16, bgcolor: 'success.main', borderRadius: 1, mr: 1 }} />
-                  <Typography variant="body2">Answered</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                  <Box sx={{ width: 16, height: 16, bgcolor: 'primary.main', borderRadius: 1, mr: 1 }} />
-                  <Typography variant="body2">Current</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Box sx={{ width: 16, height: 16, border: '1px solid #ccc', borderRadius: 1, mr: 1 }} />
-                  <Typography variant="body2">Not answered</Typography>
-                </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
-      </Container>
-
-      {/* Submit Confirmation Dialog */}
-      <Dialog open={showSubmitDialog} onClose={() => setShowSubmitDialog(false)}>
+          </CardContent>
+        </Card>
+      </Box>
+      {/* Warning Dialog */}
+      <Dialog open={showSubmitDialog} onClose={() => setShowSubmitDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Submit Exam</DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ mb: 2 }}>
             Are you sure you want to submit your exam?
           </Typography>
-          
+
           <Alert severity="info" sx={{ mb: 2 }}>
             <Typography variant="body2">
-              You have answered {getAnsweredCount()} out of {mockQuestions.length} questions.
-              {getAnsweredCount() < mockQuestions.length && (
+              You have answered {getAnsweredCount()} out of {questions.length} questions.
+              {getAnsweredCount() < questions.length && (
                 <span> Unanswered questions will be marked as incorrect.</span>
               )}
             </Typography>
           </Alert>
-          
+
+          {submitError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {submitError}
+            </Alert>
+          )}
+
+          {flash?.success && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {flash.success}
+            </Alert>
+          )}
+          {flash?.error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {flash.error}
+            </Alert>
+          )}
+
           <Typography variant="body2" color="text.secondary">
             Time remaining: {formatTime(timeRemaining)}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowSubmitDialog(false)}>
-            Continue Exam
-          </Button>
-          <Button onClick={handleSubmitExam} variant="contained" color="success">
-            Submit Final Answers
+          <Button onClick={() => setShowSubmitDialog(false)}>Continue Exam</Button>
+          <Button onClick={handleSubmitExam} variant="contained" color="success" disabled={submitting}>
+            {submitting ? 'Submitting...' : 'Submit Final Answers'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Warning Dialog */}
-      <Dialog open={showWarningDialog} onClose={() => setShowWarningDialog(false)}>
-        <DialogTitle>
-          <WarningIcon color="warning" sx={{ mr: 1 }} />
-          Warning
-        </DialogTitle>
+      {/* Results Dialog after submission */}
+      <Dialog open={showResultDialog} onClose={() => setShowResultDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Exam Submitted</DialogTitle>
         <DialogContent>
-          <Typography variant="body1">
-            You are currently taking an exam. Leaving this page will result in automatic submission 
-            of your current answers. Are you sure you want to continue?
-          </Typography>
+          {flash?.exam_result ? (
+            <Box>
+              <Alert severity={flash.exam_result.passed ? 'success' : 'warning'} sx={{ mb: 2 }}>
+                {flash.exam_result.passed ? 'Passed' : 'Completed'} — Score: {flash.exam_result.percentage}%
+              </Alert>
+              <Grid container spacing={2} sx={{ mb: 1 }}>
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="body2" color="text.secondary">Total</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 600 }}>{flash.exam_result.total}</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="body2" color="text.secondary">Correct</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 600, color: 'success.main' }}>{flash.exam_result.correct}</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="body2" color="text.secondary">Wrong</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 600, color: 'error.main' }}>{flash.exam_result.wrong}</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+                <Grid item xs={6}>
+                  <Card variant="outlined">
+                    <CardContent>
+                      <Typography variant="body2" color="text.secondary">Percentage</Typography>
+                      <Typography variant="h5" sx={{ fontWeight: 600 }}>{flash.exam_result.percentage}%</Typography>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              </Grid>
+              <Typography variant="caption" color="text.secondary">
+                Note: Exam submission also serves as attendance. This will be aligned with CAI attendance tracking.
+              </Typography>
+            </Box>
+          ) : (
+            <Typography variant="body2">No results to display.</Typography>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowWarningDialog(false)}>
-            Stay on Exam
-          </Button>
-          <Button onClick={() => router.visit(route('learner.exams'))} color="warning">
-            Leave Exam
-          </Button>
+          <Button onClick={() => router.visit(route('learner.exams'))}>Go to Exams</Button>
+          <Button variant="contained" onClick={() => setShowResultDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </LearnerLayout>
   );
 }

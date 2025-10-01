@@ -44,7 +44,8 @@ import {
     PostAdd as PostAddIcon,
     PictureAsPdf as PdfIcon,
     Description as DocIcon,
-    Publish as PublishIcon
+    Publish as PublishIcon,
+    Cancel as CancelIcon 
 } from '@mui/icons-material';
 
 export default function ReviewerMonitoring({ auth, reviewers, stats, subjects = [] }) {
@@ -546,7 +547,7 @@ export default function ReviewerMonitoring({ auth, reviewers, stats, subjects = 
                                                                             D) {question.option_d}
                                                                         </Typography>
                                                                         <Typography variant="caption" display="block" sx={{ color: 'green', fontWeight: 'bold' }}>
-                                                                            Correct Answer: {question.correct_answer}
+                                                                            Correct Answer: {question.ans_key || question.correct_answer}
                                                                         </Typography>
                                                                     </Box>
                                                                 }

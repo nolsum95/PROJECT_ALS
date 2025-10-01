@@ -144,11 +144,27 @@ class CaiDashboardController extends Controller
             'questionnaire.title' => 'nullable|string|max:255',
             'questionnaire.description' => 'nullable|string',
             'questionnaire.time_duration' => 'nullable|integer|min:1|max:300',
+            'available_at' => 'nullable|date',
+            'scheduled_post_at' => 'nullable|date',
+            'available_until' => 'nullable|date|after:available_at',
         ]);
+
+        // Normalize datetime-local (assumed entered in Asia/Manila) to app timezone
+        $tzInput = 'Asia/Manila';
+        $appTz = config('app.timezone') ?: 'UTC';
+        $availableAt = $request->available_at ? \Carbon\Carbon::parse($request->available_at, $tzInput)->setTimezone($appTz) : null;
+        $scheduledPostAt = $request->scheduled_post_at ? \Carbon\Carbon::parse($request->scheduled_post_at, $tzInput)->setTimezone($appTz) : null;
+        $availableUntil = $request->available_until ? \Carbon\Carbon::parse($request->available_until, $tzInput)->setTimezone($appTz) : null;
 
         $classwork = Classwork::create([
             'fk_cai_id' => $cai->cai_id,
             'test_level' => $request->test_level,
+            // Exams default to draft just like reviewer classworks
+            'posting_status' => 'draft',
+            // Optional scheduling
+            'scheduled_post_at' => $scheduledPostAt,
+            'available_at' => $availableAt ?? $scheduledPostAt,
+            'available_until' => $availableUntil,
         ]);
 
         if ($request->has('questionnaire') && ($request->questionnaire['subject_id'] ?? null) && ($request->questionnaire['title'] ?? null)) {
@@ -893,8 +909,9 @@ class CaiDashboardController extends Controller
             return redirect()->route('dashboard');
         }
 
-        // Get classwork created by this CAI
+        // Get reviewer classwork created by this CAI (exclude exams)
         $classworks = Classwork::where('fk_cai_id', $cai->cai_id)
+            ->where('test_level', 'reviewer')
             ->with(['questionnaires.subject', 'questionnaires.questions'])
             ->orderBy('created_at', 'desc')
             ->get();
@@ -902,11 +919,21 @@ class CaiDashboardController extends Controller
         // Get available subjects
         $subjects = \App\Models\Subject::all();
 
+        // Count unique learners who have completed reviewer attempts for this CAI
+        $reviewerSuccessCount = LearnerAttempt::whereNotNull('completed_at')
+            ->whereHas('classwork', function($q) use ($cai) {
+                $q->where('fk_cai_id', $cai->cai_id)
+                  ->where('test_level', 'reviewer');
+            })
+            ->distinct('fk_learner_id')
+            ->count('fk_learner_id');
+
         return Inertia::render('CAI/Classwork', [
             'auth' => ['user' => $user],
             'cai' => $cai,
             'classworks' => $classworks,
             'subjects' => $subjects,
+            'reviewerSuccessCount' => $reviewerSuccessCount,
             'view' => $request->get('view', 'list')
         ]);
     }
@@ -934,13 +961,14 @@ class CaiDashboardController extends Controller
             'questionnaire.time_duration' => 'nullable|integer|min:1|max:300',
         ]);
 
-        // Create the classwork
+        // Create the classwork with default 'draft' status
         $classwork = Classwork::create([
             'fk_cai_id' => $cai->cai_id,
             'fk_clc_id' => $cai->assigned_clc,
             'test_level' => $request->test_level,
             'test_title' => $request->test_title,
             'test_description' => $request->test_description,
+            'posting_status' => 'draft', // Default to draft status
         ]);
 
         // If questionnaire data is provided, create the questionnaire
@@ -954,7 +982,7 @@ class CaiDashboardController extends Controller
             ]);
         }
 
-        return redirect()->route('cai.reviewers')->with('success', 'Reviewer classwork created successfully!');
+        return redirect()->route('cai.classwork')->with('success', 'Reviewer classwork created successfully!');
     }
 
     /**
@@ -1129,7 +1157,7 @@ class CaiDashboardController extends Controller
         $cai = auth()->user()->cai;
         
         if (!$cai) {
-            return redirect()->route('cai.reviewers')->withErrors(['error' => 'CAI record not found']);
+            return redirect()->route('cai.classwork')->withErrors(['error' => 'CAI record not found']);
         }
         
         $classwork = Classwork::where('classwork_id', $validated['classwork_id'])
@@ -1157,7 +1185,7 @@ class CaiDashboardController extends Controller
             'time_duration' => $validated['time_duration']
         ]);
 
-        return redirect()->route('cai.reviewers')->with('success', 'Questionnaire created successfully!');
+        return redirect()->route('cai.classwork')->with('success', 'Questionnaire created successfully!');
     }
 
     /**
@@ -1180,7 +1208,7 @@ class CaiDashboardController extends Controller
         $cai = auth()->user()->cai;
         
         if (!$cai) {
-            return redirect()->route('cai.reviewers')->withErrors(['error' => 'CAI record not found']);
+            return redirect()->route('cai.classwork')->withErrors(['error' => 'CAI record not found']);
         }
         
         $questionnaire = Questionnaire::with('classwork')
@@ -1215,7 +1243,82 @@ class CaiDashboardController extends Controller
             $createdQuestions[] = $question;
         }
 
-        return redirect()->route('cai.reviewers')->with('success', count($createdQuestions) . ' questions added successfully!');
+        return redirect()->route('cai.classwork')->with('success', count($createdQuestions) . ' questions added successfully!');
+    }
+
+    /**
+     * Post classwork to make it visible to learners
+     */
+    public function postClasswork(Request $request)
+    {
+        $validated = $request->validate([
+            'classwork_id' => 'required|exists:classwork_tb,classwork_id'
+        ]);
+
+        $cai = auth()->user()->cai;
+        
+        if (!$cai) {
+            return back()->withErrors(['error' => 'CAI record not found']);
+        }
+
+        // Find the classwork and verify it belongs to this CAI
+        $classwork = Classwork::where('classwork_id', $validated['classwork_id'])
+            ->where('fk_cai_id', $cai->cai_id)
+            ->first();
+
+        if (!$classwork) {
+            return back()->withErrors(['error' => 'Classwork not found or access denied']);
+        }
+
+        // Check if classwork has questions
+        $hasQuestions = $classwork->questionnaires()
+            ->whereHas('questions')
+            ->exists();
+
+        if (!$hasQuestions) {
+            return back()->withErrors(['error' => 'Cannot post classwork without questions. Please add questions first.']);
+        }
+
+        // Update posting status to 'posted'
+        $classwork->update([
+            'posting_status' => 'posted',
+            'posted_at' => now()
+        ]);
+
+        return back()->with('success', 'Classwork posted successfully! It is now visible to learners.');
+    }
+
+    /**
+     * Archive classwork to hide it from learners
+     */
+    public function archiveClasswork(Request $request)
+    {
+        $validated = $request->validate([
+            'classwork_id' => 'required|exists:classwork_tb,classwork_id'
+        ]);
+
+        $cai = auth()->user()->cai;
+        
+        if (!$cai) {
+            return back()->withErrors(['error' => 'CAI record not found']);
+        }
+
+        // Find the classwork and verify it belongs to this CAI
+        $classwork = Classwork::where('classwork_id', $validated['classwork_id'])
+            ->where('fk_cai_id', $cai->cai_id)
+            ->first();
+
+        if (!$classwork) {
+            return back()->withErrors(['error' => 'Classwork not found or access denied']);
+        }
+
+        // Update posting status to 'archived'
+        $classwork->update([
+            'posting_status' => 'archived',
+            'archived_at' => now()
+        ]);
+
+        return back()->with('success', 'Classwork archived successfully! It is now hidden from learners.');
     }
 
     /**

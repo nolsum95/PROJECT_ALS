@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LearnerLayout from '@/Layouts/LearnerLayout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -53,13 +53,61 @@ export default function StudyMaterials({
   flash = {}
 }) {
   const [selectedTab, setSelectedTab] = useState(0);
-  const [selectedReviewer, setSelectedReviewer] = useState(null);
   const [showReviewerDialog, setShowReviewerDialog] = useState(false);
+  const [selectedReviewer, setSelectedReviewer] = useState(null);
+  const [ongoingSessions, setOngoingSessions] = useState({});
 
   // Use actual data from backend
   const actualReviewers = reviewers || [];
   const actualModules = modules || [];
 
+  // Check for ongoing sessions on component mount
+  useEffect(() => {
+    const checkOngoingSessions = () => {
+      const sessions = {};
+      actualReviewers.forEach(reviewer => {
+        const sessionKey = `reviewer_${reviewer.id}_${learner.learner_id}`;
+        const savedSession = localStorage.getItem(sessionKey);
+        
+        if (savedSession) {
+          try {
+            const session = JSON.parse(savedSession);
+            const now = Date.now();
+            const elapsed = Math.floor((now - session.startTime) / 1000);
+            const remaining = Math.max(0, session.totalTime - elapsed);
+            
+            if (remaining > 0) {
+              sessions[reviewer.id] = {
+                timeRemaining: remaining,
+                answersCount: Object.keys(session.answers || {}).length,
+                totalQuestions: session.totalQuestions || 0
+              };
+            }
+          } catch (error) {
+            console.error('Error checking session:', error);
+          }
+        }
+      });
+      setOngoingSessions(sessions);
+    };
+
+    if (actualReviewers.length > 0 && learner.learner_id) {
+      checkOngoingSessions();
+    }
+  }, [actualReviewers, learner.learner_id]);
+
+  // Helper function to get button text and status
+  const getReviewerButtonInfo = (reviewer) => {
+    const hasOngoingSession = ongoingSessions[reviewer.id];
+    
+    if (reviewer.completion_status === 'completed') {
+      return { text: 'Retake', variant: 'outlined', color: 'primary' };
+    } else if (hasOngoingSession) {
+      return { text: 'Continue', variant: 'contained', color: 'warning' };
+    } else {
+      return { text: 'Start', variant: 'contained', color: 'primary' };
+    }
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -310,16 +358,30 @@ export default function StudyMaterials({
                     </Box>
                   )}
 
+                  {ongoingSessions[reviewer.id] && (
+                    <Box sx={{ mb: 2, p: 1, bgcolor: 'warning.light', borderRadius: 1 }}>
+                      <Typography variant="body2" color="warning.dark">
+                        In Progress: {ongoingSessions[reviewer.id].answersCount} answers saved
+                      </Typography>
+                    </Box>
+                  )}
+
                   <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                      fullWidth
-                      variant={reviewer.completion_status === 'completed' ? 'outlined' : 'contained'}
-                      startIcon={<PlayArrowIcon />}
-                      onClick={() => handleStartReviewer(reviewer)}
-                      disabled={!reviewer.available}
-                    >
-                      {reviewer.completion_status === 'completed' ? 'Retake' : 'Start'}
-                    </Button>
+                    {(() => {
+                      const buttonInfo = getReviewerButtonInfo(reviewer);
+                      return (
+                        <Button
+                          fullWidth
+                          variant={buttonInfo.variant}
+                          color={buttonInfo.color}
+                          startIcon={<PlayArrowIcon />}
+                          onClick={() => handleStartReviewer(reviewer)}
+                          disabled={!reviewer.available}
+                        >
+                          {buttonInfo.text}
+                        </Button>
+                      );
+                    })()}
                   </Box>
                 </CardContent>
               </Card>
@@ -404,15 +466,34 @@ export default function StudyMaterials({
         </Grid>
       )}
 
-      {/* Start Reviewer Confirmation Dialog */}
+      {/* Start/Continue Reviewer Confirmation Dialog */}
       <Dialog open={showReviewerDialog} onClose={() => setShowReviewerDialog(false)} maxWidth="sm" fullWidth>
         <DialogTitle>
-          Start Reviewer: {selectedReviewer?.title}
+          {(() => {
+            if (!selectedReviewer) return 'Reviewer';
+            const buttonInfo = getReviewerButtonInfo(selectedReviewer);
+            return `${buttonInfo.text} Reviewer: ${selectedReviewer.title}`;
+          })()}
         </DialogTitle>
         <DialogContent>
-          <Alert severity="info" sx={{ mb: 2 }}>
-            You are about to start a timed reviewer. Make sure you have a stable internet connection.
-          </Alert>
+          {(() => {
+            if (!selectedReviewer) return null;
+            const hasOngoingSession = ongoingSessions[selectedReviewer.id];
+            
+            if (hasOngoingSession) {
+              return (
+                <Alert severity="warning" sx={{ mb: 2 }}>
+                  You have an ongoing session for this reviewer. You can continue where you left off with {hasOngoingSession.answersCount} answers already saved.
+                </Alert>
+              );
+            } else {
+              return (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  You are about to start a timed reviewer. Make sure you have a stable internet connection.
+                </Alert>
+              );
+            }
+          })()}
           
           {selectedReviewer && (
             <Box>
@@ -443,7 +524,11 @@ export default function StudyMaterials({
             Cancel
           </Button>
           <Button onClick={handleConfirmStart} variant="contained">
-            Start Reviewer
+            {(() => {
+              if (!selectedReviewer) return 'Start';
+              const buttonInfo = getReviewerButtonInfo(selectedReviewer);
+              return `${buttonInfo.text} Reviewer`;
+            })()}
           </Button>
         </DialogActions>
       </Dialog>

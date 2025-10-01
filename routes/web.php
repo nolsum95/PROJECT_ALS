@@ -157,18 +157,22 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'verified', 'role:Cai'])->prefix('cai')->name('cai.')->group(function () {
     Route::get('/dashboard', [\App\Http\Controllers\CaiDashboardController::class, 'dashboard'])->name('dashboard');
     Route::get('/learners', [\App\Http\Controllers\CaiDashboardController::class, 'learners'])->name('learners');
+    Route::get('/modules', [\App\Http\Controllers\CaiDashboardController::class, 'modules'])->name('modules');
     Route::get('/attendance', [CaiDashboardController::class, 'attendance'])->name('attendance');
     Route::post('/attendance', [CaiDashboardController::class, 'storeAttendance'])->name('attendance.store');
     Route::post('/attendance/mark', [\App\Http\Controllers\CaiDashboardController::class, 'markAttendance'])->name('attendance.mark');
-    Route::get('/modules', [CaiDashboardController::class, 'modules'])->name('modules');
     Route::get('/modules/{moduleId}/download', [CaiDashboardController::class, 'downloadModule'])->name('modules.download');
     Route::get('/files/{fileId}/download', [CaiDashboardController::class, 'downloadFileStorage'])->name('files.download');
     
     // CAI Reviewer Monitoring and Questionnaire Creation
-    Route::get('/reviewers', [CaiDashboardController::class, 'reviewers'])->name('reviewers');
+    Route::get('/reviewers', [CaiDashboardController::class, 'classwork'])->name('reviewers');
+    Route::get('/classwork', [CaiDashboardController::class, 'classwork'])->name('classwork');
+    Route::get('/reviewers-old', [CaiDashboardController::class, 'reviewers'])->name('reviewers.old');
     Route::post('/classwork', [CaiDashboardController::class, 'storeClasswork'])->name('classwork.store');
-    Route::post('/reviewers/questionnaires', [CaiDashboardController::class, 'storeReviewerQuestionnaire'])->name('reviewers.questionnaires.store');
-    Route::post('/reviewers/questions', [CaiDashboardController::class, 'storeReviewerQuestions'])->name('reviewers.questions.store');
+    Route::post('/classwork/questionnaire', [CaiDashboardController::class, 'storeQuestionnaire'])->name('classwork.questionnaire.store');
+    Route::post('/classwork/questions', [CaiDashboardController::class, 'storeReviewerQuestions'])->name('classwork.questions.store');
+    Route::post('/classwork/post', [CaiDashboardController::class, 'postClasswork'])->name('classwork.post');
+    Route::post('/classwork/archive', [CaiDashboardController::class, 'archiveClasswork'])->name('classwork.archive');
     Route::get('/reviewers/{classworkId}/download', [CaiDashboardController::class, 'downloadFile'])->name('reviewers.download');
 
     // CAI Exam Creation (Pretest/Posttest only)
@@ -197,9 +201,13 @@ Route::middleware(['auth', 'verified', 'role:Learner'])->prefix('learner')->name
     
     Route::get('/reviewers', [\App\Http\Controllers\LearnerDashboardController::class, 'studyMaterials'])->name('reviewers');
     Route::get('/reviewers/{reviewerId}/take', [\App\Http\Controllers\LearnerDashboardController::class, 'takeReviewer'])->name('reviewers.take');
+    Route::post('/reviewers/submit', [\App\Http\Controllers\LearnerDashboardController::class, 'submitReviewer'])->name('reviewers.submit');
+    Route::get('/reviewers/{reviewerId}/results', [\App\Http\Controllers\LearnerDashboardController::class, 'reviewerResults'])->name('reviewers.results');
     Route::get('/modules/{moduleId}/download', [\App\Http\Controllers\LearnerDashboardController::class, 'downloadModule'])->name('modules.download');
     
     Route::get('/exams', [\App\Http\Controllers\LearnerDashboardController::class, 'exams'])->name('exams');
+    Route::get('/exams/{examId}/take', [\App\Http\Controllers\LearnerDashboardController::class, 'takeExam'])->name('exams.take');
+    Route::post('/exams/submit', [\App\Http\Controllers\LearnerDashboardController::class, 'submitExam'])->name('exams.submit');
     
     Route::get('/progress', [\App\Http\Controllers\LearnerDashboardController::class, 'progress'])->name('progress');
     

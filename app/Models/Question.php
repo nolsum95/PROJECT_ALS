@@ -32,4 +32,10 @@ class Question extends Model
     {
         return $this->hasMany(LearnerAnswer::class, 'fk_question_id', 'question_id');
     }
+
+    // Accessor to map ans_key to correct_answer for compatibility
+    public function getCorrectAnswerAttribute()
+    {
+        return $this->ans_key;
+    }
 }

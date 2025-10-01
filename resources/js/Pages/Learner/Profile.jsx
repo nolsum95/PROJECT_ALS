@@ -159,7 +159,7 @@ export default function LearnerProfile({
                 fontSize: '3rem'
               }}
             >
-              {profileData.firstname?.charAt(0) || 'J'}{profileData.lastname?.charAt(0) || 'D'}
+              {profileData.fullname?.charAt(0) || 'J'}
             </Avatar>
             
             <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>

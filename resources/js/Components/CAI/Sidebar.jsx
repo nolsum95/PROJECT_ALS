@@ -48,8 +48,8 @@ export default function CaiSidebar({
     { id: 'learners', label: 'Learners', icon: <GroupIcon />, route: 'cai.learners' },
     { id: 'attendance', label: 'Attendance', icon: <EventAvailableIcon />, route: 'cai.attendance' },
     { id: 'modules', label: 'Modules', icon: <MenuBookIcon />, route: 'cai.modules' },
+     { id: 'reviewers', label: 'Reviewer', icon: <QuizIcon />, route: 'cai.reviewers' },
     { id: 'exams', label: 'Exams', icon: <ArchiveIcon />, route: 'cai.exams' },
-    { id: 'reviewers', label: 'Reviewer Monitoring', icon: <QuizIcon />, route: 'cai.reviewers' },
     { id: 'reports', label: 'Reports', icon: <SummarizeIcon />, route: 'cai.reports' },
   ];
 
@@ -67,13 +67,15 @@ export default function CaiSidebar({
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.enteringScreen,
           }),
+          bgcolor: 'primary.main',
+          color: 'white',
         }}
       >
         <Avatar
           sx={{
             width: sidebarOpen ? 48 : 40,
             height: sidebarOpen ? 48 : 40,
-            bgcolor: '#3b82f6',
+            bgcolor: 'primary.dark',
             fontSize: sidebarOpen ? '1.2rem' : '1rem',
             transition: theme.transitions.create(['width', 'height'], {
               easing: theme.transitions.easing.sharp,
@@ -85,17 +87,17 @@ export default function CaiSidebar({
         </Avatar>
         {sidebarOpen && (
           <Box sx={{ ml: 1, overflow: 'hidden' }}>
-            <Typography variant="h6" noWrap sx={{ fontWeight: 600, color: '#fff' }}>
+            <Typography variant="h6" noWrap sx={{ fontWeight: 600, color: 'white' }}>
               {displayName}
             </Typography>
-            <Typography variant="body2" sx={{ color: '#94a3b8' }} noWrap>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }} noWrap>
               Community ALS Implementor
             </Typography>
           </Box>
         )}
       </Box>
 
-      <Divider sx={{ borderColor: '#334155' }} />
+      <Divider sx={{ borderColor: 'divider' }} />
 
       {/* Navigation Menu */}
       <List sx={{ flexGrow: 1, px: 1, py: 2 }}>
@@ -111,12 +113,10 @@ export default function CaiSidebar({
                   justifyContent: sidebarOpen ? 'initial' : 'center',
                   px: 2.5,
                   borderRadius: 2,
-                  backgroundColor: isSelected ? '#3b82f6' : 'transparent',
-                  color: isSelected ? '#fff' : '#cbd5e1',
+                  backgroundColor: isSelected ? 'primary.main' : 'transparent',
+                  color: isSelected ? 'white' : 'text.primary',
                   '&:hover': {
-                    backgroundColor: isSelected 
-                      ? '#2563eb' 
-                      : 'rgba(255,255,255,0.1)',
+                    backgroundColor: isSelected ? 'primary.dark' : 'action.hover',
                   },
                   transition: theme.transitions.create(['background-color', 'color'], {
                     duration: theme.transitions.duration.short,
@@ -179,8 +179,9 @@ export default function CaiSidebar({
           '& .MuiDrawer-paper': { 
             boxSizing: 'border-box', 
             width: drawerWidth,
-            backgroundColor: '#182f54',
-            borderRight: '1px solid #334155',
+            backgroundColor: 'background.paper',
+            borderRight: '1px solid',
+            borderColor: 'divider',
           },
         }}
       >
@@ -195,8 +196,9 @@ export default function CaiSidebar({
           '& .MuiDrawer-paper': {
             boxSizing: 'border-box',
             width: sidebarOpen ? drawerWidth : collapsedWidth,
-            backgroundColor: '#182f54',
-            borderRight: '1px solid #334155',
+            backgroundColor: 'background.paper',
+            borderRight: '1px solid',
+            borderColor: 'divider',
             transition: theme.transitions.create('width', {
               easing: theme.transitions.easing.sharp,
               duration: theme.transitions.duration.enteringScreen,
